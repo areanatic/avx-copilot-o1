@@ -3,13 +3,15 @@ import { Telegraf, Context } from 'telegraf';
 import * as dotenv from 'dotenv';
 import { handleMessage } from '../services/messageHandler';
 import { setupCommands } from './commands';
+import { setupEnhancedCommands } from './enhancedCommands';
 
 dotenv.config();
 
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN!);
 
 // Bot Commands Setup
-setupCommands(bot);
+// setupCommands(bot); // Basic commands
+setupEnhancedCommands(bot); // Enhanced commands with buttons
 
 // Message Handler
 bot.on('text', async (ctx) => {
