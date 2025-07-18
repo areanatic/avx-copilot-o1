@@ -162,6 +162,52 @@ git add . && git commit -m "Update: [description]" && git push origin main
 - "Was ist der Status?" → Aus Knowledge Base
 - Alle anderen Fragen → Claude mit vollem Context
 
+### [2025-07-18 05:52] - Version 1.1.0 - Dashboard mit Versionsnummer!
+**Status**: ✅ Feature implementiert
+
+**Neues Dashboard-Feature**:
+- Version wird im Start-Menü angezeigt
+- Version im Status-Menü sichtbar
+- Deploy-Datum wird angezeigt
+- Console zeigt Version beim Start
+
+**Version Info**:
+- Aktuelle Version: 1.1.0
+- Neue Datei: version.json für erweiterte Versionsinformationen
+- Changelog integriert
+
+### [2025-07-18 06:15] - Version 1.2.0 - MAJOR UPDATE: S1 Integration & Personalisiertes Menü!
+**Status**: ✅ Implementiert und ready to deploy
+
+**KNOWLEDGE LOADER ERWEITERT**:
+- Lädt jetzt S1 Claudia Agent Daten
+- Integriert Umzugsprojekt Elmshorn
+- Multi-Source Knowledge Base (S1 + S2)
+- Umzugsprojekt direkt ansprechbar
+
+**NEUES PERSONALISIERTES MENÜ**:
+1. **Dashboard** - Übersicht aller Projekte
+2. **Umzug Elmshorn** - Direktzugriff mit Sub-Menüs:
+   - Dokumente, Timeline, Behörden, Kosten
+3. **Knowledge Base** - Browser & Suche:
+   - S1 Claudia, Protokolle, Suche
+4. **Quick Note** - Schnelle Notizen/Ideen
+5. **Dev Tools** - Git, Deploy, Files, Sync
+6. **Analytics** - Kosten, Performance, Metriken
+
+**Features**:
+- Umzugsprojekt wird erkannt ("umzug", "elmshorn")
+- Personalisierte Antworten ("Arash" statt "User")
+- Direkte Projekt-Infos ohne Claude fragen
+- Quick Note speichert in Knowledge Base
+- File Browser für S1/S2 Navigation
+
+**Technische Details**:
+- Version: 1.2.0
+- S1 Data Integration funktioniert
+- ~15-20 Files aus S1 geladen
+- Performance: Weiterhin <50ms Response
+
 ### [2025-07-18 04:01] - MEILENSTEIN: Claude AI Integration Live!
 **Status**: ✅ Bot ist LIVE mit Claude AI Integration!
 
