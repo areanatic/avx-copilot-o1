@@ -20,6 +20,12 @@ class ClaudeService {
     
     // Conversation Memory (pro User)
     this.conversations = new Map();
+    
+    // Knowledge Base
+    this.knowledgeBase = '';
+    this.baseSystemPrompt = `Du bist AVX Copilot, ein intelligenter AI Assistant im Telegram Chat.
+Du hilfst bei Entwicklung, Dokumentation, Aufgabenverwaltung und allgemeinen Fragen.
+Antworte auf Deutsch, sei hilfsbereit und präzise.`;
   }
 
   // Haupt-Methode für AI Responses
@@ -86,9 +92,12 @@ class ClaudeService {
 
   // System Prompt basierend auf Context
   buildSystemPrompt(context) {
-    let prompt = `Du bist AVX Copilot, ein intelligenter AI Assistant im Telegram Chat.
-Du hilfst bei Entwicklung, Dokumentation, Aufgabenverwaltung und allgemeinen Fragen.
-Antworte auf Deutsch, sei hilfsbereit und präzise.`;
+    let prompt = this.baseSystemPrompt;
+    
+    // Add Knowledge Base if available
+    if (this.knowledgeBase) {
+      prompt += `\n\n### PROJEKT-KONTEXT UND KNOWLEDGE BASE:\n${this.knowledgeBase}`;
+    }
 
     if (context.taskType) {
       prompt += `\n\nDer User arbeitet an einer ${context.taskType} Aufgabe.`;
@@ -163,6 +172,12 @@ Gib eine strukturierte Zusammenfassung mit Hauptpunkten.`;
   clearHistory(userId) {
     this.conversations.delete(userId);
     return "✅ Conversation History gelöscht.";
+  }
+  
+  // Update System Prompt with Knowledge Base
+  updateSystemPrompt(knowledge) {
+    this.knowledgeBase = knowledge;
+    console.log('📚 Knowledge Base updated, length:', knowledge.length);
   }
 }
 
