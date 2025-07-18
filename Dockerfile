@@ -15,4 +15,4 @@ COPY . .
 EXPOSE 3000
 
 # Start the bot
-CMD ["node", "start-production.js"]
+CMD ["node", "enhanced-bot-buttons.js"]
