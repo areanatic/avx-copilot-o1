@@ -674,6 +674,43 @@ bot.on('text', async (ctx) => {
   const userId = ctx.from.id;
   const userMessage = ctx.message.text;
   
+  // QUICK RESPONSES für bekannte Fragen
+  const lowerMessage = userMessage.toLowerCase();
+  
+  // Umzugs-Fragen
+  if (lowerMessage.includes('umzug') || lowerMessage.includes('elmshorn')) {
+    await ctx.reply(
+      `🏠 **Umzugsprojekt Elmshorn**\n\n` +
+      `Status: Aktives Projekt\n` +
+      `Personen: Arash & Alina\n` +
+      `Location: Elmshorn, Schleswig-Holstein\n\n` +
+      `📁 Alle Dokumente in:\n` +
+      `/S1/Claudia_Agent/A&A_Umzug_Elmshorn\n\n` +
+      `Wichtige Docs: Jobcenter Brief, Mietinfos\n\n` +
+      `_Frage nach spezifischen Details!_`,
+      { parse_mode: 'Markdown' }
+    );
+    return;
+  }
+  
+  // Was gibt es neues
+  if (lowerMessage.includes('was gibt') && lowerMessage.includes('neu')) {
+    const knowledge = await knowledgeLoader.loadAllKnowledge();
+    if (knowledge.length > 0) {
+      await ctx.reply(
+        `🆕 **Neue Features in v1.3.0:**\n\n` +
+        `✏️ File Editor - Dateien direkt bearbeiten\n` +
+        `🤖 Project Agents - KI-Agents für Projekte\n` +
+        `🏠 Umzugsprojekt Integration\n` +
+        `📚 Erweiterte Knowledge Base\n\n` +
+        `Knowledge Base: ${knowledge.length} Zeichen geladen\n` +
+        `S1 Integration: ✅ Aktiv`,
+        { parse_mode: 'Markdown' }
+      );
+    }
+    return;
+  }
+  
   // Quick Note Handler
   if (session.expecting === 'quick_note') {
     await ctx.sendChatAction('typing');

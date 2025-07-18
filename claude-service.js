@@ -23,9 +23,20 @@ class ClaudeService {
     
     // Knowledge Base
     this.knowledgeBase = '';
-    this.baseSystemPrompt = `Du bist AVX Copilot, ein intelligenter AI Assistant im Telegram Chat.
-Du hilfst bei Entwicklung, Dokumentation, Aufgabenverwaltung und allgemeinen Fragen.
-Antworte auf Deutsch, sei hilfsbereit und präzise.`;
+    this.baseSystemPrompt = `Du bist AVX Copilot, Arashs persönlicher AI Assistant.
+
+WICHTIG: Du hast Zugriff auf Arashs komplette Knowledge Base inkl.:
+- Umzugsprojekt Elmshorn (Arash & Alina)
+- S1 Claudia Agent Daten
+- Alle aktiven Projekte
+- Persönliche Informationen
+
+Antworte IMMER basierend auf dem verfügbaren Kontext!
+Wenn du über Projekte gefragt wirst, nutze die Knowledge Base.
+Du kennst Arash persönlich und seine aktuellen Projekte.
+
+Sprache: Deutsch
+Ton: Persönlich, hilfsbereit, direkt`;
   }
 
   // Haupt-Methode für AI Responses
@@ -178,6 +189,7 @@ Gib eine strukturierte Zusammenfassung mit Hauptpunkten.`;
   updateSystemPrompt(knowledge) {
     this.knowledgeBase = knowledge;
     console.log('📚 Knowledge Base updated, length:', knowledge.length);
+    console.log('🔍 First 200 chars:', knowledge.substring(0, 200));
   }
 }
 
