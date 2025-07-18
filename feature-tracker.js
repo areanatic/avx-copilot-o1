@@ -25,12 +25,12 @@ class FeatureTracker {
     this.features = new Map([
       ['quick_notes', {
         name: 'Quick Notes',
-        status: 10,
+        status: 100,
         category: 'core',
-        missing: ['Storage Backend', 'Search Function', 'Export'],
+        missing: [],
         dependencies: [],
-        effort: '2h',
-        priority: 'KRITISCH',
+        effort: '0h',
+        priority: 'DONE',
         lastUpdate: new Date().toISOString()
       }],
       ['kb_search', {

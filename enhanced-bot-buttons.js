@@ -1257,14 +1257,52 @@ bot.on('text', async (ctx) => {
   // Quick Note Handler
   if (session.expecting === 'quick_note') {
     await ctx.sendChatAction('typing');
-    // TODO: Save to knowledge base
-    ctx.reply(
-      `💡 *Notiz gespeichert!*\n\n"${userMessage}"\n\n_Wird in Knowledge Base archiviert_`,
-      {
-        parse_mode: 'Markdown',
-        ...mainMenu
-      }
-    );
+    
+    // Feature Check
+    const featureTracker = require('./feature-tracker');
+    if (!featureTracker.checkFeatureBeforeUse('quick_notes', ctx)) {
+      ctx.session = { ...session, expecting: null };
+      return;
+    }
+    
+    // WIRKLICH speichern mit user-notes-manager!
+    const userNotesManager = require('./user-notes-manager');
+    try {
+      const savedNote = await userNotesManager.saveNote(userId, userMessage);
+      const stats = await userNotesManager.getStats(userId);
+      
+      ctx.reply(
+        `✅ *Notiz gespeichert!*\n\n` +
+        `📝 "${userMessage}"\n\n` +
+        `📊 *Statistik:*\n` +
+        `• Notiz #${stats.total}\n` +
+        `• ${stats.totalWords} Wörter gesamt\n` +
+        `• ${stats.active} aktive Notizen\n\n` +
+        `_Gespeichert am ${new Date(savedNote.timestamp).toLocaleString('de-DE')}_`,
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [
+              Markup.button.callback('💡 Weitere Notiz', 'quick_note'),
+              Markup.button.callback('🔍 Suchen', 'search_notes')
+            ],
+            [Markup.button.callback('📱 Hauptmenü', 'back_main')]
+          ])
+        }
+      );
+    } catch (error) {
+      console.error('Error saving note:', error);
+      ctx.reply(
+        `❌ *Fehler beim Speichern!*\n\n` +
+        `${error.message}\n\n` +
+        `_Bitte versuche es erneut._`,
+        {
+          parse_mode: 'Markdown',
+          ...mainMenu
+        }
+      );
+    }
+    
     ctx.session = { ...session, expecting: null };
     return;
   }
@@ -1559,6 +1597,66 @@ bot.launch().then(async () => {
   if (agents.length > 0 && agents.find(a => a.name === 'A&A_Umzug_Elmshorn')) {
     await projectAgents.switchAgent('A&A_Umzug_Elmshorn');
     console.log('🎯 Umzugs-Agent automatisch aktiviert');
+  }
+});
+
+// Search Notes Handler
+bot.action('search_notes', async (ctx) => {
+  ctx.answerCbQuery();
+  ctx.editMessageText(
+    '🔍 **Notizen durchsuchen**\n\n' +
+    'Schicke mir einen Suchbegriff:',
+    { parse_mode: 'Markdown' }
+  );
+  ctx.session = { ...ctx.session, expecting: 'search_notes' };
+});
+
+// Show All Notes Handler
+bot.action('show_all_notes', async (ctx) => {
+  ctx.answerCbQuery();
+  const userId = ctx.from.id;
+  const userNotesManager = require('./user-notes-manager');
+  
+  try {
+    const notes = await userNotesManager.getAllNotes(userId);
+    const activeNotes = notes.filter(n => !n.archived);
+    
+    if (activeNotes.length === 0) {
+      ctx.editMessageText(
+        '📝 **Keine Notizen vorhanden**\n\n' +
+        'Du hast noch keine Notizen gespeichert.',
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('💡 Erste Notiz erstellen', 'quick_note')],
+            [Markup.button.callback('⬅️ Zurück', 'back_main')]
+          ])
+        }
+      );
+      return;
+    }
+    
+    let message = `📝 **Alle deine Notizen (${activeNotes.length}):**\n\n`;
+    activeNotes.slice(-10).reverse().forEach((note, index) => {
+      const date = new Date(note.timestamp).toLocaleString('de-DE');
+      message += `**${index + 1}.** ${note.text}\n_${date}_\n\n`;
+    });
+    
+    if (activeNotes.length > 10) {
+      message += `_... und ${activeNotes.length - 10} weitere Notizen_\n\n`;
+    }
+    
+    ctx.editMessageText(message, {
+      parse_mode: 'Markdown',
+      ...Markup.inlineKeyboard([
+        [Markup.button.callback('💡 Neue Notiz', 'quick_note')],
+        [Markup.button.callback('🔍 Suchen', 'search_notes')],
+        [Markup.button.callback('⬅️ Zurück', 'back_main')]
+      ])
+    });
+  } catch (error) {
+    console.error('Error loading notes:', error);
+    ctx.reply('❌ Fehler beim Laden der Notizen.');
   }
 });
 
