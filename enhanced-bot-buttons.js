@@ -241,7 +241,6 @@ bot.action('dashboard', handleDashboard);
 
 // Dashboard refresh handler
 bot.action('dashboard_refresh', handleDashboard);
-});
 
 // Umzug Elmshorn
 bot.action('umzug', (ctx) => {
@@ -1062,7 +1061,6 @@ _Real-time Metriken - Stand: ${new Date().toLocaleTimeString('de-DE')}_
       [Markup.button.callback('⬅️ Zurück', 'back_main')]
     ])
   });
-});
 });
 
 // Back to Main Menu
