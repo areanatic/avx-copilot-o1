@@ -11,15 +11,8 @@ const modeManager = require('./mode-manager');
 const modelSwitcher = require('./model-switcher');
 const instructionManager = require('./instruction-manager');
 const audioService = require('./audio-service');
-const statsManager = require('./stats-manager');
-const { handleDashboard } = require('./dashboard-handler');
 
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
-
-// Store start time for uptime tracking
-if (!process.env.START_TIME) {
-  process.env.START_TIME = Date.now();
-}
 
 // Main Menu Keyboard - PERSONALISIERT FÜR ARASH
 const mainMenu = Markup.inlineKeyboard([
@@ -237,10 +230,39 @@ bot.command('ai', async (ctx) => {
 // NEUE BUTTON HANDLERS - PERSONALISIERT
 
 // Dashboard - Hauptübersicht
-bot.action('dashboard', handleDashboard);
+bot.action('dashboard', async (ctx) => {
+  ctx.answerCbQuery('📊 Lade Dashboard...');
+  
+  const stats = claudeService.getStats();
+  const deployDate = new Date().toLocaleDateString('de-DE');
+  
+  const dashboardText = `
+📊 **DEIN DASHBOARD**
 
-// Dashboard refresh handler
-bot.action('dashboard_refresh', handleDashboard);
+🏠 **Umzug Elmshorn**: Aktiv
+🤖 **AVX Copilot**: v${packageInfo.version} LIVE
+🧠 **Claudia Agent**: S1 Knowledge aktiv
+
+📈 **Stats heute**:
+- AI Kosten: ${stats.estimatedCost}
+- Tokens: ${stats.totalTokens.toLocaleString()}
+- Knowledge: S1 + S2 integriert
+
+🔧 **Quick Actions**:
+- /ai [frage] - Direkt fragen
+- "umzug" - Umzugsinfos
+- "status" - Detailstatus
+
+_Stand: ${deployDate} ${new Date().toLocaleTimeString('de-DE')}_
+  `;
+  
+  ctx.editMessageText(dashboardText, {
+    parse_mode: 'Markdown',
+    ...Markup.inlineKeyboard([
+      [Markup.button.callback('🔄 Refresh', 'dashboard')],
+      [Markup.button.callback('⬅️ Zurück', 'back_main')]
+    ])
+  });
 });
 
 // Umzug Elmshorn
@@ -1010,34 +1032,19 @@ bot.action('analytics', async (ctx) => {
   
   const stats = claudeService.getStats();
   const audioStats = audioService.getStats();
-  const persistentStats = statsManager.getCurrentStats();
-  
-  // Calculate real-time metrics
-  const avgTokensPerMessage = persistentStats.total.messages > 0 
-    ? Math.round(persistentStats.total.tokens / persistentStats.total.messages)
-    : 0;
-    
-  const avgCostPerMessage = persistentStats.total.messages > 0
-    ? (persistentStats.total.cost / persistentStats.total.messages).toFixed(4)
-    : '0.0000';
   
   const analyticsText = `
 📈 **Analytics & Metriken**
 
-💰 **Kosten (Persistent)**:
-- Heute: ${persistentStats.today.cost.toFixed(4)} (${persistentStats.today.messages} msgs)
-- Total: ${persistentStats.total.cost.toFixed(4)} (${persistentStats.total.messages} msgs)
-- Ø pro Message: ${avgCostPerMessage}
-
-📊 **Token Usage**:
-- Heute: ${persistentStats.today.tokens.toLocaleString()}
-- Total: ${persistentStats.total.tokens.toLocaleString()}
-- Ø pro Message: ${avgTokensPerMessage}
+💰 **Kosten**:
+- Claude AI: ${stats.estimatedCost}
+- Audio: ${audioStats.totalCost.toFixed(4)}
+- Tokens: ${stats.totalTokens.toLocaleString()}
+- Rate: ~$0.02 pro Anfrage
 
 🎙️ **Audio Transkription**:
 - Status: ${audioStats.isConfigured ? '🔵 Aktiv' : '🔴 Inaktiv'}
 - Transkriptionen: ${audioStats.totalTranscriptions}
-- Voice Minutes: ${persistentStats.total.voiceMinutes.toFixed(1)}
 - Fehlerrate: ${audioStats.errors}/${audioStats.totalTranscriptions}
 - Ø Dauer: ${audioStats.avgDuration.toFixed(1)}s
 - Geschätzt/Monat: ${audioStats.estimatedMonthlyCost}
@@ -1063,7 +1070,6 @@ _Real-time Metriken - Stand: ${new Date().toLocaleTimeString('de-DE')}_
     ])
   });
 });
-});
 
 // Back to Main Menu
 bot.action('back_main', (ctx) => {
@@ -1085,9 +1091,6 @@ bot.action('clear_history', (ctx) => {
 // Voice Message Handler
 bot.on('voice', async (ctx) => {
   const userId = ctx.from.id;
-  
-  // Track voice message in persistent stats
-  statsManager.trackMessage(userId, 'voice');
   const fileId = ctx.message.voice.file_id;
   const duration = ctx.message.voice.duration;
   
@@ -1215,9 +1218,6 @@ bot.on('text', async (ctx) => {
   const session = ctx.session || {};
   const userId = ctx.from.id;
   const userMessage = ctx.message.text;
-  
-  // Track message in persistent stats
-  statsManager.trackMessage(userId, 'text');
   
   // QUICK RESPONSES für bekannte Fragen
   const lowerMessage = userMessage.toLowerCase();

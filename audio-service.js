@@ -5,6 +5,7 @@ const OpenAI = require('openai');
 const axios = require('axios');
 const fs = require('fs').promises;
 const path = require('path');
+const statsManager = require('./stats-manager');
 
 class AudioService {
   constructor() {
@@ -109,6 +110,10 @@ class AudioService {
       this.stats.avgDuration = 
         (this.stats.avgDuration * (this.stats.totalTranscriptions - 1) + duration) / 
         this.stats.totalTranscriptions;
+      
+      // Track in persistent stats
+      const durationInMinutes = duration / 60;
+      statsManager.trackVoiceMinutes(durationInMinutes);
 
       // Clean up temp file
       await this.cleanupFile(filePath);

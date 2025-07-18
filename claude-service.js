@@ -1,5 +1,6 @@
 // 🤖 Claude AI Service for AVX Copilot
 const Anthropic = require('@anthropic-ai/sdk');
+const statsManager = require('./stats-manager');
 require('dotenv').config();
 
 class ClaudeService {
@@ -14,9 +15,8 @@ class ClaudeService {
       console.log('✅ Claude Service initialisiert');
     }
     
-    // Token Tracking
-    this.tokenCount = 0;
-    this.costEstimate = 0;
+    // Model info
+    this.currentModel = 'claude-3-opus-20240229';
     
     // Conversation Memory (pro User)
     this.conversations = new Map();
@@ -73,8 +73,15 @@ Ton: Persönlich, hilfsbereit, direkt`;
         messages: messages
       });
       
-      // Token Tracking
-      this.trackUsage(response.usage);
+      // Token Tracking mit persistentem StatsManager
+      if (response.usage) {
+        statsManager.trackTokens(
+          response.usage.input_tokens,
+          response.usage.output_tokens,
+          'claude-3-opus'
+        );
+      }
+      statsManager.trackMessage(userId, 'ai-response');
       
       // Speichere in History (begrenzt auf letzte 10 Nachrichten)
       history.push({ role: 'user', content: message });
@@ -121,17 +128,9 @@ Ton: Persönlich, hilfsbereit, direkt`;
     return prompt;
   }
 
-  // Token & Cost Tracking
+  // Legacy method - jetzt nutzen wir statsManager
   trackUsage(usage) {
-    if (usage) {
-      this.tokenCount += usage.input_tokens + usage.output_tokens;
-      // Claude Opus: $15/1M input, $75/1M output tokens
-      const inputCost = (usage.input_tokens / 1000000) * 15;
-      const outputCost = (usage.output_tokens / 1000000) * 75;
-      this.costEstimate += inputCost + outputCost;
-      
-      console.log(`📊 Tokens: ${usage.input_tokens}+${usage.output_tokens} | Kosten: $${(inputCost + outputCost).toFixed(4)}`);
-    }
+    // Moved to statsManager
   }
 
   // Spezial-Funktionen
@@ -169,13 +168,18 @@ Gib eine strukturierte Zusammenfassung mit Hauptpunkten.`;
     return this.getResponse('system', prompt, { taskType: 'summary' });
   }
 
-  // Status & Stats
+  // Status & Stats - jetzt mit persistenten Daten
   getStats() {
+    const stats = statsManager.getCurrentStats();
     return {
-      totalTokens: this.tokenCount,
-      estimatedCost: `$${this.costEstimate.toFixed(2)}`,
+      totalTokens: stats.total.tokens,
+      estimatedCost: `${stats.total.cost.toFixed(2)}`,
+      todayTokens: stats.today.tokens,
+      todayCost: `${stats.today.cost.toFixed(2)}`,
+      todayMessages: stats.today.messages,
       activeConversations: this.conversations.size,
-      isConfigured: !!this.client
+      isConfigured: !!this.client,
+      timestamp: stats.timestamp
     };
   }
 

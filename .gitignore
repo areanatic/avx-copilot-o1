@@ -30,3 +30,12 @@ logs/
 # Testing
 coverage/
 .nyc_output/
+
+# Bot Stats
+bot-stats.json
+
+# Audio temp files
+audio-temp/
+*.oga
+*.mp3
+*.wav
