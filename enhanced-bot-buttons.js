@@ -2,6 +2,7 @@
 const { Telegraf, Markup } = require('telegraf');
 require('dotenv').config();
 const claudeService = require('./claude-service');
+const knowledgeLoader = require('./knowledge-loader');
 
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
 
@@ -86,7 +87,17 @@ bot.command('ai', async (ctx) => {
   }
   
   await ctx.sendChatAction('typing');
-  const response = await claudeService.getResponse(ctx.from.id, message);
+  
+  // Prüfe zuerst Knowledge Base
+  const knowledgeAnswer = await knowledgeLoader.answerQuestion(message);
+  
+  let response;
+  if (knowledgeAnswer) {
+    response = knowledgeAnswer;
+  } else {
+    response = await claudeService.getResponse(ctx.from.id, message);
+  }
+  
   ctx.reply(response, { parse_mode: 'Markdown' });
 });
 
@@ -308,16 +319,26 @@ bot.on('text', async (ctx) => {
     );
     ctx.session = { ...session, expecting: null, lastTask: userMessage };
   } else {
-    // Default Claude AI response
+    // Default: Check Knowledge Base first, then Claude AI
     await ctx.sendChatAction('typing');
     
     try {
-      const context = {
-        userName: ctx.from.first_name || 'User',
-        ...session
-      };
+      // Prüfe zuerst, ob Knowledge Base die Frage direkt beantworten kann
+      const knowledgeAnswer = await knowledgeLoader.answerQuestion(userMessage);
       
-      const aiResponse = await claudeService.getResponse(userId, userMessage, context);
+      let aiResponse;
+      if (knowledgeAnswer) {
+        // Direkte Antwort aus Knowledge Base
+        aiResponse = knowledgeAnswer;
+      } else {
+        // Claude AI mit Knowledge Context
+        const context = {
+          userName: ctx.from.first_name || 'User',
+          ...session
+        };
+        
+        aiResponse = await claudeService.getResponse(userId, userMessage, context);
+      }
       
       ctx.reply(
         aiResponse,
@@ -351,9 +372,16 @@ bot.use((ctx, next) => {
   return next();
 });
 
-// Launch
-bot.launch().then(() => {
+// Launch mit Knowledge Base Loading
+bot.launch().then(async () => {
   console.log('🚀 AVX Copilot o1 with Buttons is running!');
+  
+  // Lade Knowledge Base beim Start
+  const knowledge = await knowledgeLoader.loadAllKnowledge();
+  if (knowledge) {
+    claudeService.updateSystemPrompt(knowledge);
+    console.log('✅ Knowledge Base in Claude AI geladen!');
+  }
 });
 
 // Graceful stop
