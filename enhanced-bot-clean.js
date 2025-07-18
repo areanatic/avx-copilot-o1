@@ -10,30 +10,86 @@ const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
 // Clean Main Menu - Only working features
 const mainMenu = Markup.inlineKeyboard([
   [
-    Markup.button.callback('📊 Status', 'status'),
-    Markup.button.callback('📝 Context', 'context')
+    Markup.button.callback('🚀 C-Start', 'c_start'),
+    Markup.button.callback('📊 Status', 'status')
   ],
   [
-    Markup.button.callback('🔄 CP Update', 'cp_update'),
+    Markup.button.callback('📝 Context', 'context'),
     Markup.button.callback('❓ Hilfe', 'help')
   ]
 ]);
 
-// Start Command
-bot.command('start', (ctx) => {
+// Start Command - Auto-loads Knowledge Base
+bot.command('start', async (ctx) => {
   const stats = claudeService.getStats();
   const aiStatus = stats.isConfigured ? '🟢 Claude AI aktiv' : '🔴 Claude AI nicht konfiguriert';
   
-  ctx.reply(
-    `🚀 *AVX Copilot o1 - Dev Assistant*\n\n` +
-    `Ich bin dein AI Assistant mit vollem Projekt-Kontext.\n` +
-    `${aiStatus}\n\n` +
-    `Schreibe einfach drauf los oder nutze die Commands:`,
-    {
-      parse_mode: 'Markdown',
-      ...mainMenu
+  // Show loading message
+  const loadingMsg = await ctx.reply('🚀 *AVX Copilot startet...*\n\n📚 Lade aktuelle Knowledge Base...', {
+    parse_mode: 'Markdown'
+  });
+  
+  try {
+    // Auto-load knowledge base on start
+    const knowledgeFiles = [
+      'STARTER_PROMPT_UPDATED.md',
+      'knowledge/PROJECT_PROTOCOL.md',
+      'knowledge/STRATEGIC_DECISIONS.md',
+      'knowledge/CLAUDE_CAPABILITIES.md'
+    ];
+    
+    let combinedKnowledge = '';
+    let successCount = 0;
+    
+    for (const file of knowledgeFiles) {
+      try {
+        const content = await fs.readFile(path.join(__dirname, file), 'utf8');
+        combinedKnowledge += `\n\n### ${file}\n${content}`;
+        successCount++;
+      } catch (error) {
+        console.log(`⚠️ Could not load ${file}`);
+      }
     }
-  );
+    
+    if (successCount > 0) {
+      claudeService.updateSystemPrompt(combinedKnowledge);
+      console.log(`✅ Loaded ${successCount}/${knowledgeFiles.length} knowledge files`);
+    }
+    
+    // Delete loading message
+    await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id);
+    
+    // Show welcome with updated status
+    ctx.reply(
+      `🚀 *AVX Copilot o1 - Dev Assistant*\n\n` +
+      `Ich bin dein AI Assistant mit vollem Projekt-Kontext.\n` +
+      `${aiStatus}\n` +
+      `📚 Knowledge Base: ${successCount} Dateien geladen\n\n` +
+      `Schreibe einfach drauf los oder nutze die Commands:`,
+      {
+        parse_mode: 'Markdown',
+        ...mainMenu
+      }
+    );
+  } catch (error) {
+    console.error('Start command error:', error);
+    // Delete loading message if still exists
+    try {
+      await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id);
+    } catch {}
+    
+    // Show welcome anyway
+    ctx.reply(
+      `🚀 *AVX Copilot o1 - Dev Assistant*\n\n` +
+      `Ich bin dein AI Assistant.\n` +
+      `${aiStatus}\n\n` +
+      `Schreibe einfach drauf los oder nutze die Commands:`,
+      {
+        parse_mode: 'Markdown',
+        ...mainMenu
+      }
+    );
+  }
 });
 
 // Menu Command
@@ -125,18 +181,18 @@ Gestartet: 18.07.2025, 00:13 Uhr
   }
 }
 
-// CP Update Command & Button
-bot.command('cp_update', async (ctx) => handleCpUpdate(ctx));
-bot.action('cp_update', async (ctx) => {
-  ctx.answerCbQuery('Aktualisiere Knowledge Base...');
-  await handleCpUpdate(ctx);
-});
-
-async function handleCpUpdate(ctx) {
+// C-Start - Fresh Co-Pilot Start
+bot.action('c_start', async (ctx) => {
+  ctx.answerCbQuery('Co-Pilot wird neu gestartet...');
+  
   try {
     await ctx.sendChatAction('typing');
     
-    // Load knowledge files
+    // Clear conversation history
+    const userId = ctx.from.id;
+    claudeService.clearHistory(userId);
+    
+    // Load fresh knowledge base
     const knowledgeFiles = [
       'STARTER_PROMPT_UPDATED.md',
       'knowledge/PROJECT_PROTOCOL.md',
@@ -157,39 +213,34 @@ async function handleCpUpdate(ctx) {
       }
     }
     
-    // Update Claude Service with new knowledge
+    // Update Claude with fresh knowledge
     claudeService.updateSystemPrompt(combinedKnowledge);
     
     const responseText = `
-🔄 *Knowledge Base Update*
+🚀 *Co-Pilot Neustart erfolgreich!*
 
-*Geladene Dateien:*
+*Geladene Knowledge Base:*
 ${loadedFiles.join('\n')}
 
-✅ Claude wurde mit aktuellem Projekt-Kontext aktualisiert!
+✅ Conversation History gelöscht
+✅ Aktuellste Projekt-Infos geladen
+✅ Bereit für neue Session!
 
-Der Bot kennt jetzt:
-• Alle strategischen Entscheidungen
-• Aktuellen Entwicklungsstand
-• Projekt-Historie
-• Desktop MCP Features
-  `;
+Ich bin jetzt dein AVX Copilot mit vollem Projekt-Kontext.
+Wie in unserem Desktop-Chat, nur mobil!
+
+Wie kann ich dir helfen?
+    `;
     
-    const message = {
+    ctx.editMessageText(responseText, {
       parse_mode: 'Markdown',
-      ...Markup.inlineKeyboard([[Markup.button.callback('📱 Menü', 'back_main')]])
-    };
-    
-    if (ctx.callbackQuery) {
-      ctx.editMessageText(responseText, message);
-    } else {
-      ctx.reply(responseText, message);
-    }
+      ...mainMenu
+    });
   } catch (error) {
-    console.error('CP Update Error:', error);
-    ctx.reply('❌ Fehler beim Update. Bitte erneut versuchen.');
+    console.error('C-Start Error:', error);
+    ctx.reply('❌ Fehler beim Neustart. Bitte erneut versuchen.');
   }
-}
+});
 
 // Help Command & Button
 bot.command('help', async (ctx) => handleHelp(ctx));
@@ -203,12 +254,17 @@ async function handleHelp(ctx) {
 ❓ *Hilfe & Commands*
 
 *Verfügbare Commands:*
-/start - Bot starten
+/start - Bot starten (lädt Knowledge automatisch)
 /menu - Hauptmenü anzeigen
 /status - System Status
 /context - Projekt-Kontext
-/cp_update - Knowledge Base updaten
 /help - Diese Hilfe
+
+*Menü-Buttons:*
+🚀 C-Start - Co-Pilot Neustart mit frischer Knowledge Base
+📊 Status - Zeigt AI-Metriken und Kosten
+📝 Context - Zeigt Projekt-Übersicht
+❓ Hilfe - Diese Hilfe
 
 *Free Chat:*
 Schreibe einfach drauf los! Ich habe vollen Zugriff auf:
@@ -218,9 +274,9 @@ Schreibe einfach drauf los! Ich habe vollen Zugriff auf:
 • Aktuelle TODOs
 
 *Tipps:*
-• Ich erinnere mich an unsere Gespräche
-• Nutze /cp_update für neueste Infos
-• Frage mich alles über AVX Copilot!
+• Knowledge Base wird beim Start automatisch geladen
+• Nutze "C-Start" für einen Fresh-Restart
+• Ich bin wie dein Desktop-Claude, nur mobil!
   `;
   
   const message = {
@@ -284,7 +340,7 @@ bot.on('text', async (ctx) => {
     if (userMessage.toLowerCase().includes('update') || 
         userMessage.toLowerCase().includes('änderung') ||
         userMessage.toLowerCase().includes('neu')) {
-      replyButtons.push([Markup.button.callback('🔄 CP Update', 'cp_update')]);
+      replyButtons.push([Markup.button.callback('🚀 C-Start', 'c_start')]);
     }
     
     replyButtons.push([Markup.button.callback('📱 Menü', 'back_main')]);
