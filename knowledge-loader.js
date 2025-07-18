@@ -57,16 +57,17 @@ class KnowledgeLoader {
     }
   }
 
-  // Lade S1 Claudia Agent Daten
+  // Lade S1 Claudia Agent Daten - JETZT VOLLSTÄNDIG
   async loadS1Data() {
-    console.log('🗺️  Lade S1 Claudia Agent Daten...');
+    console.log('🗺️  Lade ALLE S1 Claudia Agent Daten...');
     
     try {
       // START_HERE Files
       const startHereFiles = [
         'SUPERBRAIN_ARCHITECTURE_DECISIONS.md',
         'SUPERBRAIN_TASK.md',
-        'active_silos_index.md'
+        'active_silos_index.md',
+        'README.md'
       ];
       
       for (const file of startHereFiles) {
@@ -80,22 +81,91 @@ class KnowledgeLoader {
         }
       }
 
-      // Agent Context Files
+      // ALLE Agent Context Files (nicht mehr begrenzt)
       const contextPath = path.join(this.knowledgePaths.claudiaAgent, '03_Databases_Knowledge/Agent_Context_Files');
       try {
         const files = await fs.readdir(contextPath);
-        for (const file of files.slice(0, 5)) { // Erstmal nur erste 5 Files
+        for (const file of files) {
           if (file.endsWith('.md')) {
-            const content = await fs.readFile(path.join(contextPath, file), 'utf8');
-            this.s1Data[`CONTEXT_${file}`] = content;
-            console.log(`✅ Context geladen: ${file}`);
+            try {
+              const content = await fs.readFile(path.join(contextPath, file), 'utf8');
+              this.s1Data[`CONTEXT_${file}`] = content;
+              console.log(`✅ Context geladen: ${file}`);
+            } catch (e) {
+              console.log(`⚠️  Fehler bei ${file}`);
+            }
           }
         }
       } catch (error) {
         console.log('⚠️  Keine Agent Context Files gefunden');
       }
+
+      // Lade ALLE Active Projects
+      const projectsPath = path.join(this.knowledgePaths.claudiaAgent, '02_Active_Agents/Active_Projects');
+      try {
+        const projects = await fs.readdir(projectsPath);
+        for (const project of projects) {
+          const projectPath = path.join(projectsPath, project);
+          const stats = await fs.stat(projectPath);
+          
+          if (stats.isDirectory()) {
+            console.log(`📁 Lade Projekt: ${project}`);
+            await this.loadProjectData(project, projectPath);
+          }
+        }
+      } catch (error) {
+        console.log('⚠️  Fehler beim Laden der Projekte:', error.message);
+      }
+
+      // Lade Master Templates
+      const templatesPath = path.join(this.knowledgePaths.claudiaAgent, '01_Master_Templates');
+      try {
+        const templates = await fs.readdir(templatesPath);
+        for (const template of templates.slice(0, 10)) { // Erste 10 Templates
+          if (template.endsWith('.md')) {
+            const content = await fs.readFile(path.join(templatesPath, template), 'utf8');
+            this.s1Data[`TEMPLATE_${template}`] = content;
+            console.log(`✅ Template geladen: ${template}`);
+          }
+        }
+      } catch (error) {
+        console.log('⚠️  Keine Templates gefunden');
+      }
+
+      console.log(`✅ S1 Daten vollständig geladen: ${Object.keys(this.s1Data).length} Files`);
+      
     } catch (error) {
       console.error('⚠️  Fehler beim Laden der S1 Daten:', error.message);
+    }
+  }
+
+  // Lädt komplettes Projekt
+  async loadProjectData(projectName, projectPath) {
+    try {
+      // Lade README wenn vorhanden
+      try {
+        const readme = await fs.readFile(path.join(projectPath, 'README.md'), 'utf8');
+        this.s1Data[`PROJECT_${projectName}_README`] = readme;
+      } catch (e) {}
+
+      // Lade AGENT_INSTRUCTION wenn vorhanden
+      try {
+        const instruction = await fs.readFile(path.join(projectPath, 'AGENT_INSTRUCTION.md'), 'utf8');
+        this.s1Data[`PROJECT_${projectName}_INSTRUCTION`] = instruction;
+      } catch (e) {}
+
+      // Lade erste Ebene von Dokumenten
+      const items = await fs.readdir(projectPath);
+      for (const item of items) {
+        if (item.endsWith('.md') && item !== 'README.md' && item !== 'AGENT_INSTRUCTION.md') {
+          try {
+            const content = await fs.readFile(path.join(projectPath, item), 'utf8');
+            this.s1Data[`PROJECT_${projectName}_${item}`] = content;
+          } catch (e) {}
+        }
+      }
+    } catch (error) {
+      console.log(`⚠️  Fehler beim Laden von Projekt ${projectName}`);
     }
   }
 

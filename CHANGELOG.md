@@ -1,42 +1,59 @@
-# AVX Copilot o1 - Change Log
-*Alle Änderungen chronologisch dokumentiert*
+# AVX Copilot v1.3.0 - New Features Release
 
-## 2025-07-18
+## 🎉 New Features
 
-### 00:35 - Existierende Dokumentation entdeckt und integriert
-**Typ:** [WISSEN]
-**Entdeckte Ressourcen:**
-- Claudia Agent Library Integration
-- MCP Server Configurations
-- Bestehende Knowledge Base Links
-- Railway Deployment (Bot ist LIVE!)
+### ✏️ Telegram File Editor
+- Edit files directly through Telegram
+- Automatic backup creation before changes
+- Support for S1 and S2 spaces
+- Session management for editing
 
-**Erkenntnisse:**
-- AVX Copilot ist Teil eines größeren Ökosystems (Claudia)
-- Bot läuft bereits erfolgreich auf Railway
-- Umfangreiche Dokumentation vorhanden
+### 🤖 Project Agents System
+- Dynamic AI agents for different projects
+- Each agent has its own AGENT_INSTRUCTION.md
+- Switch between agents on the fly
+- Usage tracking and statistics
+- Automatic agent loading on startup
 
-### 00:30 - Knowledge Management System initialisiert
-**Typ:** [WISSEN]
-**Dateien erstellt:**
-- `PROJECT_KNOWLEDGE.md` - Zentrale Wissensdatenbank
-- `SECOND_BRAIN_ARCHITECTURE.md` - Architektur-Konzept
-- `CHANGELOG.md` - Dieses Änderungsprotokoll
+## 🔧 Technical Improvements
 
-**Begründung:** Strukturierte Wissensspeicherung nach User-Anweisung
+- Enhanced Dev Tools menu with new options
+- Improved error handling
+- Better session management
+- Modular architecture with new services
 
-### 00:13 - Projekt-Briefing erhalten
-**Typ:** Requirements
-**Kernpunkte:**
-- Multi-Agent System geplant
-- Second Brain Integration
-- Telegram/WhatsApp Evaluation
-- Strikte Änderungskontrolle etabliert
+## 📝 Files Added/Modified
+
+### New Files:
+- `telegram-file-editor.js` - File editing service
+- `project-agents.js` - Agent management system
+
+### Modified Files:
+- `enhanced-bot-buttons.js` - Integration of new features
+- `README.md` - Updated documentation
+- `knowledge-loader.js` - Enhanced knowledge loading
+
+## 🚀 How to Use
+
+### File Editor:
+1. Go to Dev Tools → File Editor
+2. Choose "List Files" to see available files
+3. Send the full path to edit a file
+4. Make your changes and save
+
+### Project Agents:
+1. Go to Dev Tools → Project Agents
+2. List available agents
+3. Switch to the agent you need
+4. The bot will use that agent's instructions
+
+## 🐛 Known Issues
+- None reported yet
+
+## 📅 Next Steps
+- Voice message processing
+- Document analysis features
+- Multi-language support
 
 ---
-
-## Conventions
-- **[WISSEN]** - Wissensspeicherung (immer erlaubt)
-- **[CODE]** - Code-Änderungen (nur mit GO)
-- **[STRUKTUR]** - Strukturelle Änderungen (nur mit GO)
-- **[CONFIG]** - Konfigurationsänderungen (nur mit GO)
+*Pushed by AVX Copilot Development Assistant*

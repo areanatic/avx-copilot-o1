@@ -1,9 +1,12 @@
 // AVX Copilot o1 - Enhanced Bot with Buttons & Claude AI
 const { Telegraf, Markup } = require('telegraf');
 require('dotenv').config();
+const path = require('path');
 const claudeService = require('./claude-service');
 const knowledgeLoader = require('./knowledge-loader');
 const packageInfo = require('./package.json');
+const fileEditor = require('./telegram-file-editor');
+const projectAgents = require('./project-agents');
 
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
 
@@ -28,6 +31,10 @@ const devToolsMenu = Markup.inlineKeyboard([
   [
     Markup.button.callback('🚀 Git Push', 'git_push'),
     Markup.button.callback('📦 Deploy Status', 'deploy_status')
+  ],
+  [
+    Markup.button.callback('✏️ File Editor', 'file_editor'),
+    Markup.button.callback('🤖 Projekt Agents', 'project_agents')
   ],
   [
     Markup.button.callback('📁 Browse Files', 'browse_files'),
@@ -421,6 +428,335 @@ bot.action('sync_knowledge', (ctx) => {
   );
 });
 
+// FILE EDITOR
+bot.action('file_editor', (ctx) => {
+  ctx.answerCbQuery();
+  ctx.editMessageText(
+    '✏️ **File Editor**\n\n' +
+    'Wähle eine Aktion:',
+    {
+      parse_mode: 'Markdown',
+      ...Markup.inlineKeyboard([
+        [Markup.button.callback('📄 File editieren', 'edit_file')],
+        [Markup.button.callback('📁 Files anzeigen', 'list_editable_files')],
+        [Markup.button.callback('📝 Neue Datei', 'create_file')],
+        [Markup.button.callback('⬅️ Zurück', 'dev_tools')]
+      ])
+    }
+  );
+});
+
+// Liste editierbare Files
+bot.action('list_editable_files', async (ctx) => {
+  ctx.answerCbQuery();
+  
+  const s1Files = await fileEditor.listEditableFiles('/Users/az/Documents/A+/AVX/Spaces/S1');
+  const s2Files = await fileEditor.listEditableFiles('/Users/az/Documents/A+/AVX/Spaces/S2');
+  
+  let message = '📁 **Editierbare Dateien**\n\n';
+  
+  if (s1Files.length > 0) {
+    message += '**S1 Spaces:**\n';
+    s1Files.slice(0, 5).forEach(f => {
+      message += `• ${f.name} (${f.size})\n`;
+    });
+  }
+  
+  if (s2Files.length > 0) {
+    message += '\n**S2 Spaces:**\n';
+    s2Files.slice(0, 5).forEach(f => {
+      message += `• ${f.name} (${f.size})\n`;
+    });
+  }
+  
+  message += '\n_Schicke mir den vollständigen Pfad der Datei, die du editieren möchtest._';
+  
+  ctx.editMessageText(message, {
+    parse_mode: 'Markdown',
+    ...Markup.inlineKeyboard([
+      [Markup.button.callback('⬅️ Zurück', 'file_editor')]
+    ])
+  });
+});
+
+// Edit File
+bot.action('edit_file', (ctx) => {
+  ctx.answerCbQuery();
+  ctx.session = { ...ctx.session, expecting: 'file_path_edit' };
+  
+  ctx.editMessageText(
+    '📄 **File editieren**\n\n' +
+    'Schicke mir den vollständigen Pfad der Datei, die du editieren möchtest.\n\n' +
+    'Beispiel:\n' +
+    '`/Users/az/Documents/A+/AVX/Spaces/S1/README.md`\n\n' +
+    '_Schicke "cancel" zum Abbrechen._',
+    {
+      parse_mode: 'Markdown'
+    }
+  );
+});
+
+// PROJECT AGENTS
+bot.action('project_agents', (ctx) => {
+  ctx.answerCbQuery();
+  ctx.editMessageText(
+    '🤖 **Projekt Agents**\n\n' +
+    'Verwalte deine KI-Agents für verschiedene Projekte:',
+    {
+      parse_mode: 'Markdown',
+      ...Markup.inlineKeyboard([
+        [Markup.button.callback('📋 Liste Agents', 'list_agents')],
+        [Markup.button.callback('🔄 Agent wechseln', 'switch_agent')],
+        [Markup.button.callback('✏️ Instruction bearbeiten', 'edit_instruction')],
+        [Markup.button.callback('➕ Neuer Agent', 'create_agent')],
+        [Markup.button.callback('⬅️ Zurück', 'dev_tools')]
+      ])
+    }
+  );
+});
+
+// Liste alle Agents
+bot.action('list_agents', (ctx) => {
+  ctx.answerCbQuery();
+  
+  const agents = projectAgents.listAgents();
+  let message = '📋 **Verfügbare Projekt-Agents**\n\n';
+  
+  if (agents.length === 0) {
+    message += '_Keine Agents gefunden._';
+  } else {
+    agents.forEach(agent => {
+      const status = agent.active ? '🟢' : '⚪';
+      const lastUsed = agent.lastUsed ? 
+        `\n   Zuletzt: ${new Date(agent.lastUsed).toLocaleDateString('de-DE')}` : '';
+      message += `${status} **${agent.name}**\n   Nutzungen: ${agent.uses}${lastUsed}\n\n`;
+    });
+    
+    if (projectAgents.activeAgent) {
+      message += `\n🎯 Aktiv: **${projectAgents.activeAgent.name}**`;
+    }
+  }
+  
+  ctx.editMessageText(message, {
+    parse_mode: 'Markdown',
+    ...Markup.inlineKeyboard([
+      [Markup.button.callback('⬅️ Zurück', 'project_agents')]
+    ])
+  });
+});
+
+// Switch Agent
+bot.action('switch_agent', (ctx) => {
+  ctx.answerCbQuery();
+  ctx.session = { ...ctx.session, expecting: 'switch_agent_name' };
+  
+  const agents = projectAgents.listAgents();
+  let message = '🔄 **Agent wechseln**\n\n';
+  message += 'Verfügbare Agents:\n';
+  
+  agents.forEach(agent => {
+    message += `• ${agent.name}${agent.active ? ' (aktiv)' : ''}\n`;
+  });
+  
+  message += '\n_Schicke mir den Namen des Agents, den du aktivieren möchtest._';
+  
+  ctx.editMessageText(message, {
+    parse_mode: 'Markdown'
+  });
+});
+
+// Edit Instruction
+bot.action('edit_instruction', (ctx) => {
+  ctx.answerCbQuery();
+  
+  if (!projectAgents.activeAgent) {
+    ctx.editMessageText(
+      '❌ **Kein aktiver Agent**\n\n' +
+      'Wähle zuerst einen Agent aus.',
+      {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback('⬅️ Zurück', 'project_agents')]
+        ])
+      }
+    );
+    return;
+  }
+  
+  ctx.session = { ...ctx.session, expecting: 'new_instruction_prompt' };
+  
+  ctx.editMessageText(
+    `✏️ **Instruction Prompt bearbeiten**\n\n` +
+    `Agent: **${projectAgents.activeAgent.name}**\n\n` +
+    `Aktueller Prompt:\n` +
+    `_${projectAgents.activeAgent.instructionPrompt.substring(0, 300)}..._\n\n` +
+    `Schicke mir den neuen Instruction Prompt für diesen Agent.`,
+    {
+      parse_mode: 'Markdown'
+    }
+  );
+});
+
+// Create Agent
+bot.action('create_agent', (ctx) => {
+  ctx.answerCbQuery();
+  ctx.session = { ...ctx.session, expecting: 'new_agent_name' };
+  
+  ctx.editMessageText(
+    '➕ **Neuer Projekt-Agent**\n\n' +
+    'Wie soll der neue Agent heißen?\n\n' +
+    'Beispiele:\n' +
+    '• Marketing_Campaign_2025\n' +
+    '• Code_Review_Bot\n' +
+    '• Research_Assistant\n\n' +
+    '_Der Name sollte das Projekt beschreiben._',
+    {
+      parse_mode: 'Markdown'
+    }
+  );
+});
+
+// (Entfernt - Duplikat)
+  const s2Files = await fileEditor.listEditableFiles('/Users/az/Documents/A+/AVX/Spaces/S2/avx-copilot-o1/knowledge');
+  
+  let fileList = '📁 **Editierbare Files**\n\n';
+  
+  if (s1Files.length > 0) {
+    fileList += '**S1 Projekte:**\n';
+    s1Files.forEach(f => {
+      fileList += `• ${f.name} (${f.size})\n`;
+    });
+    fileList += '\n';
+  }
+  
+  if (s2Files.length > 0) {
+    fileList += '**S2 Knowledge:**\n';
+    s2Files.forEach(f => {
+      fileList += `• ${f.name} (${f.size})\n`;
+    });
+  }
+  
+  fileList += '\n_Sage mir welche Datei du editieren möchtest_';
+  
+  ctx.editMessageText(fileList, {
+    parse_mode: 'Markdown',
+    ...Markup.inlineKeyboard([[Markup.button.callback('⬅️ Zurück', 'file_editor')]])
+  });
+  
+  ctx.session = { ...ctx.session, expecting: 'file_path_to_edit' };
+});
+
+bot.action('edit_file', (ctx) => {
+  ctx.answerCbQuery();
+  ctx.editMessageText(
+    '📄 **File editieren**\n\n' +
+    'Gib den vollständigen Pfad zur Datei an, die du editieren möchtest.\n\n' +
+    'Beispiele:\n' +
+    '• /S1/.../AGENT_INSTRUCTION.md\n' +
+    '• /S2/.../PROJECT_PROTOCOL.md',
+    {
+      parse_mode: 'Markdown',
+      ...Markup.inlineKeyboard([[Markup.button.callback('⬅️ Zurück', 'file_editor')]])
+    }
+  );
+  ctx.session = { ...ctx.session, expecting: 'file_path_to_edit' };
+});
+
+// PROJECT AGENTS
+bot.action('project_agents', async (ctx) => {
+  ctx.answerCbQuery('🤖 Lade Agents...');
+  
+  const agents = await projectAgents.loadAllAgents();
+  const agentsList = projectAgents.listAgents();
+  
+  let agentsText = '🤖 **Projekt Agents**\n\n';
+  
+  if (agentsList.length > 0) {
+    agentsText += '📁 **Verfügbare Agents:**\n';
+    agentsList.forEach(agent => {
+      const status = agent.active ? ' ✅' : '';
+      agentsText += `• ${agent.name}${status}\n`;
+    });
+    
+    if (projectAgents.activeAgent) {
+      agentsText += `\n🎯 **Aktiver Agent**: ${projectAgents.activeAgent.name}`;
+    }
+  } else {
+    agentsText += '_Keine Agents gefunden_';
+  }
+  
+  ctx.editMessageText(agentsText, {
+    parse_mode: 'Markdown',
+    ...Markup.inlineKeyboard([
+      [Markup.button.callback('🔄 Agent wechseln', 'switch_agent')],
+      [Markup.button.callback('✏️ Instruction editieren', 'edit_instruction')],
+      [Markup.button.callback('➕ Neuer Agent', 'create_agent')],
+      [Markup.button.callback('⬅️ Zurück', 'dev_tools')]
+    ])
+  });
+});
+
+bot.action('switch_agent', async (ctx) => {
+  ctx.answerCbQuery();
+  const agents = projectAgents.listAgents();
+  
+  if (agents.length === 0) {
+    ctx.reply('Keine Agents verfügbar!');
+    return;
+  }
+  
+  ctx.editMessageText(
+    '🔄 **Agent wechseln**\n\n' +
+    'Schreibe den Namen des Agents, den du aktivieren möchtest:\n\n' +
+    agents.map(a => `• ${a.name}`).join('\n'),
+    {
+      parse_mode: 'Markdown',
+      ...Markup.inlineKeyboard([[Markup.button.callback('⬅️ Zurück', 'project_agents')]])
+    }
+  );
+  
+  ctx.session = { ...ctx.session, expecting: 'switch_agent_name' };
+});
+
+bot.action('edit_instruction', async (ctx) => {
+  ctx.answerCbQuery();
+  
+  if (!projectAgents.activeAgent) {
+    ctx.reply('Kein Agent aktiv! Wähle erst einen Agent.');
+    return;
+  }
+  
+  const agent = projectAgents.activeAgent;
+  
+  ctx.editMessageText(
+    `✏️ **Instruction Prompt editieren**\n\n` +
+    `Agent: ${agent.name}\n\n` +
+    `Aktueller Prompt (Anfang):\n„${agent.instructionPrompt.substring(0, 200)}...“\n\n` +
+    `_Schicke mir den neuen Instruction Prompt_`,
+    {
+      parse_mode: 'Markdown',
+      ...Markup.inlineKeyboard([[Markup.button.callback('⬅️ Zurück', 'project_agents')]])
+    }
+  );
+  
+  ctx.session = { ...ctx.session, expecting: 'new_instruction_prompt' };
+});
+
+bot.action('create_agent', (ctx) => {
+  ctx.answerCbQuery();
+  ctx.editMessageText(
+    '➕ **Neuen Agent erstellen**\n\n' +
+    'Gib den Namen für den neuen Agent ein:\n\n' +
+    'Beispiel: "Email Assistant" oder "Code Review"',
+    {
+      parse_mode: 'Markdown',
+      ...Markup.inlineKeyboard([[Markup.button.callback('⬅️ Zurück', 'project_agents')]])
+    }
+  );
+  
+  ctx.session = { ...ctx.session, expecting: 'new_agent_name' };
+});
+
 // Analytics
 bot.action('analytics', async (ctx) => {
   ctx.answerCbQuery('Lade Analytics...');
@@ -521,6 +857,157 @@ bot.on('text', async (ctx) => {
     return;
   }
   
+  // FILE EDIT HANDLERS
+  if (session.expecting === 'file_path_to_edit') {
+    const filePath = userMessage.trim();
+    
+    // Konvertiere Shortcuts
+    const fullPath = filePath
+      .replace('/S1/', '/Users/az/Documents/A+/AVX/Spaces/S1/')
+      .replace('/S2/', '/Users/az/Documents/A+/AVX/Spaces/S2/');
+    
+    const result = await fileEditor.startEdit(userId, fullPath);
+    
+    if (result.error) {
+      ctx.reply(`❌ Fehler: ${result.error}`);
+      ctx.session = { ...session, expecting: null };
+      return;
+    }
+    
+    await ctx.reply(
+      `📄 **File geöffnet**: ${path.basename(fullPath)}\n\n` +
+      `Größe: ${result.size}\n` +
+      `Zeilen: ${result.lines}\n\n` +
+      `_Schicke mir den neuen Inhalt oder "cancel" zum Abbrechen_`,
+      { parse_mode: 'Markdown' }
+    );
+    
+    // Zeige ersten Teil des Contents
+    const preview = result.content.substring(0, 1000);
+    await ctx.reply(`👀 **Vorschau**:\n\n\`\`\`\n${preview}${result.content.length > 1000 ? '...' : ''}\n\`\`\``);
+    
+    ctx.session = { ...session, expecting: 'file_content_edit', editingFile: fullPath };
+    return;
+  }
+  
+  if (session.expecting === 'file_content_edit') {
+    if (userMessage.toLowerCase() === 'cancel') {
+      fileEditor.editSessions.delete(userId);
+      ctx.reply('❌ Edit abgebrochen', mainMenu);
+      ctx.session = { ...session, expecting: null };
+      return;
+    }
+    
+    const result = await fileEditor.saveEdit(userId, userMessage);
+    
+    if (result.error) {
+      ctx.reply(`❌ Fehler beim Speichern: ${result.error}`);
+    } else {
+      ctx.reply(
+        `✅ **Datei gespeichert!**\n\n` +
+        `Backup: ${path.basename(result.backupPath)}\n` +
+        `Änderungen: ${result.changes.charactersChanged} Zeichen\n` +
+        `Zeilen: ${result.changes.linesAdded > 0 ? '+' : ''}${result.changes.linesAdded}`,
+        { parse_mode: 'Markdown', ...mainMenu }
+      );
+    }
+    
+    ctx.session = { ...session, expecting: null, editingFile: null };
+    return;
+  }
+  
+  // PROJECT AGENT HANDLERS
+  if (session.expecting === 'switch_agent_name') {
+    const agentName = userMessage.trim();
+    const result = await projectAgents.switchAgent(agentName);
+    
+    if (result.error) {
+      ctx.reply(`❌ ${result.error}`);
+    } else {
+      // Update Claude's System Prompt
+      const knowledge = await knowledgeLoader.loadAllKnowledge();
+      const fullPrompt = projectAgents.getSystemPrompt(knowledge);
+      claudeService.updateSystemPrompt(fullPrompt);
+      
+      ctx.reply(
+        `🎯 **Agent aktiviert**: ${result.agent.name}\n\n` +
+        `Instruction Prompt:\n_${result.agent.instructionPrompt}_`,
+        { parse_mode: 'Markdown', ...mainMenu }
+      );
+    }
+    
+    ctx.session = { ...session, expecting: null };
+    return;
+  }
+  
+  if (session.expecting === 'new_instruction_prompt') {
+    const newPrompt = userMessage;
+    const agentName = projectAgents.activeAgent?.name;
+    
+    if (!agentName) {
+      ctx.reply('❌ Kein aktiver Agent!');
+      ctx.session = { ...session, expecting: null };
+      return;
+    }
+    
+    const result = await projectAgents.updateInstructionPrompt(agentName, newPrompt);
+    
+    if (result.error) {
+      ctx.reply(`❌ Fehler: ${result.error}`);
+    } else {
+      // Update Claude's System Prompt
+      const knowledge = await knowledgeLoader.loadAllKnowledge();
+      const fullPrompt = projectAgents.getSystemPrompt(knowledge);
+      claudeService.updateSystemPrompt(fullPrompt);
+      
+      ctx.reply(
+        `✅ **Instruction Prompt aktualisiert!**\n\n` +
+        `Agent: ${agentName}\n` +
+        `Backup: ${path.basename(result.backupPath)}`,
+        { parse_mode: 'Markdown', ...mainMenu }
+      );
+    }
+    
+    ctx.session = { ...session, expecting: null };
+    return;
+  }
+  
+  if (session.expecting === 'new_agent_name') {
+    const agentName = userMessage.trim();
+    ctx.session = { ...session, expecting: 'new_agent_instruction', newAgentName: agentName };
+    
+    ctx.reply(
+      `🤖 **Neuer Agent**: ${agentName}\n\n` +
+      `Schicke mir jetzt den Instruction Prompt für diesen Agent.\n\n` +
+      `Beispiel:\n` +
+      `_"Du bist ein Experte für... Deine Aufgabe ist es..."_`,
+      { parse_mode: 'Markdown' }
+    );
+    return;
+  }
+  
+  if (session.expecting === 'new_agent_instruction') {
+    const agentName = session.newAgentName;
+    const instruction = userMessage;
+    
+    const result = await projectAgents.createAgent(agentName, instruction);
+    
+    if (result.error) {
+      ctx.reply(`❌ Fehler: ${result.error}`);
+    } else {
+      ctx.reply(
+        `✅ **Agent erstellt!**\n\n` +
+        `Name: ${result.agent.name}\n` +
+        `Pfad: ${result.agent.path}\n\n` +
+        `Der Agent kann jetzt aktiviert werden.`,
+        { parse_mode: 'Markdown', ...mainMenu }
+      );
+    }
+    
+    ctx.session = { ...session, expecting: null, newAgentName: null };
+    return;
+  }
+  
   // Default: Check Knowledge Base first, then Claude AI
   await ctx.sendChatAction('typing');
   
@@ -584,6 +1071,16 @@ bot.launch().then(async () => {
   if (knowledge) {
     claudeService.updateSystemPrompt(knowledge);
     console.log('✅ Knowledge Base in Claude AI geladen!');
+  }
+  
+  // Lade Project Agents
+  const agents = await projectAgents.loadAllAgents();
+  console.log(`🤖 ${agents.length} Projekt-Agents verfügbar`);
+  
+  // Aktiviere Standard-Agent wenn vorhanden
+  if (agents.length > 0 && agents.find(a => a.name === 'A&A_Umzug_Elmshorn')) {
+    await projectAgents.switchAgent('A&A_Umzug_Elmshorn');
+    console.log('🎯 Umzugs-Agent automatisch aktiviert');
   }
 });
 
