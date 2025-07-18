@@ -4,7 +4,7 @@
   "description": "AVX Copilot o1 ist ein Telegram-basierter AI Assistant, der als eigenständiges Projekt entwickelt wird. Es nutzt bewährte Patterns aus der Claudia-Wissensdatenbank, ist aber komplett unabhängig.",
   "main": "start-production.js",
   "scripts": {
-    "start": "node start-production.js",
+    "start": "node force-deploy.js",
     "dev": "node enhanced-bot-buttons.js",
     "build": "echo 'No build needed for JS'",
     "test": "node test-bot.js"
