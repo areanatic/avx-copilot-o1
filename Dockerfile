@@ -15,4 +15,4 @@ COPY . .
 EXPOSE 3000
 
 # Start the bot
-CMD ["node", "enhanced-bot-buttons.js"]
+CMD ["node", "railway-start.js"]
