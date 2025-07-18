@@ -1,6 +1,7 @@
-// AVX Copilot o1 - Enhanced Bot with Buttons
+// AVX Copilot o1 - Enhanced Bot with Buttons & Claude AI
 const { Telegraf, Markup } = require('telegraf');
 require('dotenv').config();
+const claudeService = require('./claude-service');
 
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
 
@@ -48,9 +49,14 @@ const settingsMenu = Markup.inlineKeyboard([
 
 // Start Command
 bot.command('start', (ctx) => {
+  const stats = claudeService.getStats();
+  const aiStatus = stats.isConfigured ? '🟢 Claude AI aktiv' : '🔴 Claude AI nicht konfiguriert';
+  
   ctx.reply(
     `🚀 *Willkommen bei AVX Copilot o1!*\n\n` +
-    `Ich bin dein intelligenter Assistant. Was möchtest du tun?`,
+    `Ich bin dein intelligenter AI Assistant powered by Claude.\n` +
+    `${aiStatus}\n\n` +
+    `Was möchtest du tun?`,
     {
       parse_mode: 'Markdown',
       ...mainMenu
@@ -61,6 +67,27 @@ bot.command('start', (ctx) => {
 // Menu Command
 bot.command('menu', (ctx) => {
   ctx.reply('📱 Hauptmenü:', mainMenu);
+});
+
+// AI Command - Direct AI interaction
+bot.command('ai', async (ctx) => {
+  const stats = claudeService.getStats();
+  const message = ctx.message.text.replace('/ai', '').trim();
+  
+  if (!message) {
+    ctx.reply(
+      '🤖 *Claude AI Direkt-Modus*\n\n' +
+      'Schreibe `/ai [deine Frage]` um direkt mit Claude zu sprechen.\n\n' +
+      `Status: ${stats.isConfigured ? '🟢 Aktiv' : '🔴 Nicht konfiguriert'}\n` +
+      `Kosten bisher: ${stats.estimatedCost}`,
+      { parse_mode: 'Markdown' }
+    );
+    return;
+  }
+  
+  await ctx.sendChatAction('typing');
+  const response = await claudeService.getResponse(ctx.from.id, message);
+  ctx.reply(response, { parse_mode: 'Markdown' });
 });
 
 // Button Handlers
@@ -78,14 +105,18 @@ bot.action('new_task', (ctx) => {
 bot.action('status', async (ctx) => {
   ctx.answerCbQuery('Lade Status...');
   
+  const stats = claudeService.getStats();
+  const aiEmoji = stats.isConfigured ? '🟢' : '🔴';
+  
   const statusText = `
 ✅ *System Status*
 
 🟢 Bot: Online
 ⚡ Response: <50ms
-🧠 AI: Aktiv
-💾 Speicher: 89% frei
-🔄 Uptime: 2h 34m
+${aiEmoji} Claude AI: ${stats.isConfigured ? 'Aktiv' : 'Nicht konfiguriert'}
+💰 AI Kosten: ${stats.estimatedCost}
+📈 Tokens genutzt: ${stats.totalTokens.toLocaleString()}
+🔄 Aktive Chats: ${stats.activeConversations}
 
 _Letztes Update: ${new Date().toLocaleString('de-DE')}_
   `;
@@ -137,13 +168,16 @@ bot.action('help', (ctx) => {
 *Verfügbare Befehle:*
 /start - Bot starten
 /menu - Hauptmenü anzeigen
+/ai [text] - Direkt mit Claude sprechen
 /help - Diese Hilfe
 
 *Features:*
-• 📋 Aufgaben erstellen und verwalten
-• 🔍 Intelligente Suche
-• 📊 Status-Übersicht
-• 📝 Notizen speichern
+• 🤖 Claude AI Integration - Intelligente Antworten
+• 📋 Aufgaben erstellen und AI-analysieren lassen
+• 🔍 AI-powered Suche
+• 📊 Status mit AI-Metriken
+• 📝 Conversation Memory
+• 💰 Kostentracking in Echtzeit
 • ⚙️ Anpassbare Einstellungen
 
 *Tipps:*
@@ -232,13 +266,28 @@ bot.action('notif_toggle', (ctx) => {
   // Toggle logic here
 });
 
+// Clear Claude History
+bot.action('clear_history', (ctx) => {
+  const userId = ctx.from.id;
+  const result = claudeService.clearHistory(userId);
+  ctx.answerCbQuery('Conversation neu gestartet!');
+  ctx.reply(result, mainMenu);
+});
+
 // Text Handler for context-aware responses
-bot.on('text', (ctx) => {
+bot.on('text', async (ctx) => {
   const session = ctx.session || {};
+  const userId = ctx.from.id;
+  const userMessage = ctx.message.text;
   
   if (session.expecting === 'search') {
+    // AI-powered search
+    await ctx.sendChatAction('typing');
+    const searchPrompt = `Der User sucht nach: "${userMessage}". Gib hilfreiche Informationen oder Vorschläge.`;
+    const aiResponse = await claudeService.getResponse(userId, searchPrompt, { expecting: 'search' });
+    
     ctx.reply(
-      `🔍 Suche nach: *${ctx.message.text}*\n\nHier sind die Ergebnisse...`,
+      `🔍 *Suchergebnisse für: ${userMessage}*\n\n${aiResponse}`,
       {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([[Markup.button.callback('🔍 Neue Suche', 'search'), Markup.button.callback('📱 Menü', 'back_main')]])
@@ -246,20 +295,47 @@ bot.on('text', (ctx) => {
     );
     ctx.session = { ...session, expecting: null };
   } else if (session.expecting === 'task_description') {
+    // AI Task Analysis
+    await ctx.sendChatAction('typing');
+    const analysis = await claudeService.analyzeTask(userMessage);
+    
     ctx.reply(
-      `✅ Aufgabe gespeichert!\n\n*${ctx.message.text}*`,
+      `✅ *Aufgabe analysiert!*\n\n${analysis}`,
       {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([[Markup.button.callback('📋 Neue Aufgabe', 'new_task'), Markup.button.callback('📱 Menü', 'back_main')]])
       }
     );
-    ctx.session = { ...session, expecting: null };
+    ctx.session = { ...session, expecting: null, lastTask: userMessage };
   } else {
-    // Default AI response
-    ctx.reply(
-      `💬 ${ctx.message.text}\n\nIch arbeite an einer Antwort...`,
-      Markup.inlineKeyboard([[Markup.button.callback('📱 Menü', 'back_main')]])
-    );
+    // Default Claude AI response
+    await ctx.sendChatAction('typing');
+    
+    try {
+      const context = {
+        userName: ctx.from.first_name || 'User',
+        ...session
+      };
+      
+      const aiResponse = await claudeService.getResponse(userId, userMessage, context);
+      
+      ctx.reply(
+        aiResponse,
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('📋 Neue Aufgabe', 'new_task'), Markup.button.callback('🔍 Suche', 'search')],
+            [Markup.button.callback('🔄 Neu starten', 'clear_history'), Markup.button.callback('📱 Menü', 'back_main')]
+          ])
+        }
+      );
+    } catch (error) {
+      console.error('AI Response Error:', error);
+      ctx.reply(
+        '❌ Ein Fehler ist aufgetreten. Versuche es später nochmal.',
+        Markup.inlineKeyboard([[Markup.button.callback('📱 Menü', 'back_main')]])
+      );
+    }
   }
 });
 
