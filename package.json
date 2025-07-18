@@ -1,13 +1,15 @@
 {
   "name": "avx-copilot-o1",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "AVX Copilot o1 ist ein Telegram-basierter AI Assistant, der als eigenständiges Projekt entwickelt wird. Es nutzt bewährte Patterns aus der Claudia-Wissensdatenbank, ist aber komplett unabhängig.",
   "main": "start-production.js",
   "scripts": {
     "start": "node railway-start.js",
     "dev": "node enhanced-bot-buttons.js",
     "build": "echo 'No build needed for JS'",
-    "test": "node test-bot.js"
+    "test": "node test-bot.js",
+    "cleanup": "node audio-cleanup.js",
+    "test:audio": "node -e \"console.log('OpenAI Key:', process.env.OPENAI_API_KEY ? 'Configured' : 'Missing')\""
   },
   "keywords": [],
   "author": "",
@@ -19,6 +21,7 @@
     "axios": "^1.10.0",
     "dotenv": "^17.2.0",
     "express": "^5.1.0",
+    "openai": "^4.52.7",
     "telegraf": "^4.16.3"
   },
   "devDependencies": {

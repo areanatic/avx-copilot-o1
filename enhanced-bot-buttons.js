@@ -10,6 +10,7 @@ const projectAgents = require('./project-agents');
 const modeManager = require('./mode-manager');
 const modelSwitcher = require('./model-switcher');
 const instructionManager = require('./instruction-manager');
+const audioService = require('./audio-service');
 
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
 
@@ -1030,14 +1031,23 @@ bot.action('analytics', async (ctx) => {
   ctx.answerCbQuery('Lade Analytics...');
   
   const stats = claudeService.getStats();
+  const audioStats = audioService.getStats();
   
   const analyticsText = `
 📈 **Analytics & Metriken**
 
 💰 **Kosten**:
-- Heute: ${stats.estimatedCost}
+- Claude AI: ${stats.estimatedCost}
+- Audio: ${audioStats.totalCost.toFixed(4)}
 - Tokens: ${stats.totalTokens.toLocaleString()}
 - Rate: ~$0.02 pro Anfrage
+
+🎙️ **Audio Transkription**:
+- Status: ${audioStats.isConfigured ? '🔵 Aktiv' : '🔴 Inaktiv'}
+- Transkriptionen: ${audioStats.totalTranscriptions}
+- Fehlerrate: ${audioStats.errors}/${audioStats.totalTranscriptions}
+- Ø Dauer: ${audioStats.avgDuration.toFixed(1)}s
+- Geschätzt/Monat: ${audioStats.estimatedMonthlyCost}
 
 🧠 **Knowledge Base**:
 - S1 Files: ${Object.keys(knowledgeLoader.s1Data || {}).length}
@@ -1049,7 +1059,7 @@ bot.action('analytics', async (ctx) => {
 - Uptime: 99.9%
 - Version: ${packageInfo.version}
 
-_Real-time Metriken_
+_Real-time Metriken - Stand: ${new Date().toLocaleTimeString('de-DE')}_
   `;
   
   ctx.editMessageText(analyticsText, {
@@ -1076,6 +1086,131 @@ bot.action('clear_history', (ctx) => {
   const result = claudeService.clearHistory(userId);
   ctx.answerCbQuery('Conversation neu gestartet!');
   ctx.reply(result, mainMenu);
+});
+
+// Voice Message Handler
+bot.on('voice', async (ctx) => {
+  const userId = ctx.from.id;
+  const fileId = ctx.message.voice.file_id;
+  const duration = ctx.message.voice.duration;
+  
+  // Check if audio service is configured
+  if (!audioService.isConfigured) {
+    await ctx.reply(
+      '❌ **Audio-Transkription nicht verfügbar**\n\n' +
+      'OpenAI API Key fehlt. Features:\n' +
+      '• Sprachnachrichten werden nicht transkribiert\n' +
+      '• Nutze Textnachrichten stattdessen\n\n' +
+      '_Admin: OPENAI_API_KEY in .env setzen_',
+      { parse_mode: 'Markdown', ...mainMenu }
+    );
+    return;
+  }
+  
+  // Send typing indicator
+  await ctx.sendChatAction('typing');
+  
+  try {
+    // Get file link from Telegram
+    const fileLink = await ctx.telegram.getFileLink(fileId);
+    
+    // Send transcribing message
+    const statusMsg = await ctx.reply(
+      `🎙️ **Transkribiere Sprachnachricht...**\n` +
+      `Dauer: ${duration}s\n\n` +
+      `_Dies kann einen Moment dauern..._`,
+      { parse_mode: 'Markdown' }
+    );
+    
+    // Process voice message
+    const result = await audioService.processVoiceMessage(fileLink.href, 'de');
+    
+    // Delete status message
+    try {
+      await ctx.deleteMessage(statusMsg.message_id);
+    } catch (e) {
+      // Ignore if already deleted
+    }
+    
+    if (result.success) {
+      // Show transcription
+      const transcribedText = result.text;
+      
+      await ctx.reply(
+        `🎙️ **Transkription erfolgreich!**\n\n` +
+        `📝 _"${transcribedText}"_\n\n` +
+        `⏱️ Dauer: ${result.duration.toFixed(1)}s\n` +
+        `💵 Kosten: ~${result.cost.toFixed(4)}\n\n` +
+        `⏳ Verarbeite deine Anfrage...`,
+        { parse_mode: 'Markdown' }
+      );
+      
+      // Now process the transcribed text through knowledge base and AI
+      await ctx.sendChatAction('typing');
+      
+      // Check knowledge base first
+      const knowledgeAnswer = await knowledgeLoader.answerQuestion(transcribedText);
+      
+      let aiResponse;
+      if (knowledgeAnswer) {
+        aiResponse = knowledgeAnswer;
+      } else {
+        // Use Claude AI with model switcher
+        const instruction = instructionManager.getCurrentInstruction(userId);
+        const systemPrompt = claudeService.systemPrompt + '\n\n' + instruction;
+        
+        const response = await modelSwitcher.getResponse(userId, transcribedText, systemPrompt);
+        aiResponse = response.content;
+        
+        // Show which model was used
+        const modelInfo = modelSwitcher.getModelInfo(response.model);
+        aiResponse += `\n\n_${modelInfo.icon} ${modelInfo.name} verwendet_`;
+      }
+      
+      // Send AI response with voice-specific buttons
+      await ctx.reply(aiResponse, {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback('🎙️ Neue Sprachnachricht', 'voice_tip')],
+          [Markup.button.callback('📝 Text schreiben', 'text_tip')],
+          [Markup.button.callback('📱 Menü', 'back_main')]
+        ])
+      });
+      
+    } else {
+      // Transcription failed
+      await ctx.reply(
+        `❌ **Transkription fehlgeschlagen**\n\n` +
+        `Fehler: ${result.error}\n\n` +
+        `**Mögliche Lösungen:**\n` +
+        `• Versuche es erneut\n` +
+        `• Spreche deutlicher\n` +
+        `• Kürzere Nachricht (max 25MB)\n` +
+        `• Schreibe stattdessen\n\n` +
+        `_Falls das Problem weiterhin besteht, nutze Textnachrichten._`,
+        { parse_mode: 'Markdown', ...mainMenu }
+      );
+    }
+    
+  } catch (error) {
+    console.error('Voice processing error:', error);
+    await ctx.reply(
+      '❌ **Fehler beim Verarbeiten der Sprachnachricht**\n\n' +
+      `Details: ${error.message}\n\n` +
+      '_Bitte versuche es erneut oder nutze eine Textnachricht._',
+      { parse_mode: 'Markdown', ...mainMenu }
+    );
+  }
+});
+
+// Voice tip callback
+bot.action('voice_tip', (ctx) => {
+  ctx.answerCbQuery('🎙️ Halte die Mikrofon-Taste gedrückt!', true);
+});
+
+// Text tip callback
+bot.action('text_tip', (ctx) => {
+  ctx.answerCbQuery('📝 Schreibe deine Nachricht einfach in den Chat!', true);
 });
 
 // Text Handler for context-aware responses
