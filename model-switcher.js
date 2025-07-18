@@ -12,7 +12,7 @@ class ModelSwitcher {
     // Model configurations
     this.models = {
       haiku: {
-        id: 'claude-3-haiku-20240307',
+        id: 'claude-3-5-haiku-20241022',
         name: 'Claude Haiku',
         icon: '💨',
         description: 'Schnell & günstig für einfache Aufgaben',
@@ -26,7 +26,7 @@ class ModelSwitcher {
         useCases: ['Kurze Antworten', 'Listen', 'Einfache Fragen']
       },
       sonnet: {
-        id: 'claude-3-sonnet-20240229',
+        id: 'claude-3-5-sonnet-20241022',
         name: 'Claude Sonnet',
         icon: '🎭',
         description: 'Ausgewogen für die meisten Aufgaben',
@@ -40,7 +40,7 @@ class ModelSwitcher {
         useCases: ['Analyse', 'Coding', 'Detaillierte Antworten']
       },
       opus: {
-        id: 'claude-3-opus-20240229',
+        id: 'claude-3-5-sonnet-20241022', // Using Sonnet as fallback - Opus deprecated
         name: 'Claude Opus',
         icon: '🎨',
         description: 'Maximum Power für komplexe Aufgaben',

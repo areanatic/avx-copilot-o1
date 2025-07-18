@@ -581,8 +581,8 @@ bot.action('set_mode_FULL_POWER', (ctx) => {
     claudeService.updateSystemPrompt(knowledge);
   });
   
-  // Return to mode menu
-  bot.emit('action', Object.assign(ctx, { match: ['mode_switch'] }));
+  // Mode switched successfully
+  ctx.answerCbQuery(`✅ ${newMode.name} aktiviert!`);
 });
 
 bot.action('set_mode_SHOWCASE', (ctx) => {
@@ -594,8 +594,8 @@ bot.action('set_mode_SHOWCASE', (ctx) => {
     claudeService.updateSystemPrompt(knowledge);
   });
   
-  // Return to mode menu
-  bot.emit('action', Object.assign(ctx, { match: ['mode_switch'] }));
+  // Mode switched successfully
+  ctx.answerCbQuery(`✅ ${newMode.name} aktiviert!`);
 });
 
 // MODEL SWITCHER
