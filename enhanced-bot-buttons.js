@@ -3,10 +3,13 @@ const { Telegraf, Markup } = require('telegraf');
 require('dotenv').config();
 const path = require('path');
 const claudeService = require('./claude-service');
-const knowledgeLoader = require('./knowledge-loader');
+const knowledgeLoader = require('./knowledge-loader-v2'); // Updated to v2
 const packageInfo = require('./package.json');
 const fileEditor = require('./telegram-file-editor');
 const projectAgents = require('./project-agents');
+const modeManager = require('./mode-manager');
+const modelSwitcher = require('./model-switcher');
+const instructionManager = require('./instruction-manager');
 
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
 
@@ -26,22 +29,34 @@ const mainMenu = Markup.inlineKeyboard([
   ]
 ]);
 
-// Dev Tools Menu
-const devToolsMenu = Markup.inlineKeyboard([
-  [
-    Markup.button.callback('🚀 Git Push', 'git_push'),
-    Markup.button.callback('📦 Deploy Status', 'deploy_status')
-  ],
-  [
-    Markup.button.callback('✏️ File Editor', 'file_editor'),
-    Markup.button.callback('🤖 Projekt Agents', 'project_agents')
-  ],
-  [
-    Markup.button.callback('📁 Browse Files', 'browse_files'),
-    Markup.button.callback('🔄 Sync Knowledge', 'sync_knowledge')
-  ],
-  [Markup.button.callback('⬅️ Zurück', 'back_main')]
-]);
+// Dev Tools Menu - ERWEITERT (jetzt als Funktion für dynamische Werte)
+const getDevToolsMenu = () => {
+  const currentMode = modeManager.getCurrentMode();
+  const currentModel = modelSwitcher.getModelInfo();
+  
+  return Markup.inlineKeyboard([
+    [
+      Markup.button.callback('🚀 Git Push', 'git_push'),
+      Markup.button.callback('📦 Deploy Status', 'deploy_status')
+    ],
+    [
+      Markup.button.callback('✏️ File Editor', 'file_editor'),
+      Markup.button.callback('🤖 Projekt Agents', 'project_agents')
+    ],
+    [
+      Markup.button.callback('📁 Browse Files', 'browse_files'),
+      Markup.button.callback('🔄 Sync Knowledge', 'sync_knowledge')
+    ],
+    [
+      Markup.button.callback(`🔐 Mode: ${currentMode.icon}`, 'mode_switch'),
+      Markup.button.callback(`🤖 Model: ${currentModel.icon}`, 'model_switch')
+    ],
+    [
+      Markup.button.callback('📝 Instruction Editor', 'instruction_editor')
+    ],
+    [Markup.button.callback('⬅️ Zurück', 'back_main')]
+  ]);
+};
 
 // Umzug Menu
 const umzugMenu = Markup.inlineKeyboard([
@@ -74,13 +89,17 @@ bot.command('start', (ctx) => {
   const stats = claudeService.getStats();
   const aiStatus = stats.isConfigured ? '🟢 Claude AI aktiv' : '🔴 Claude AI nicht konfiguriert';
   const deployDate = new Date().toLocaleDateString('de-DE');
+  const mode = modeManager.getCurrentMode();
+  const model = modelSwitcher.getModelInfo();
   
   ctx.reply(
     `🚀 *Willkommen Arash!*\n\n` +
     `Dein persönlicher AI Assistant ist bereit.\n` +
     `${aiStatus}\n\n` +
     `🔧 *Version:* ${packageInfo.version}\n` +
-    `📅 *Deployed:* ${deployDate}\n\n` +
+    `📅 *Deployed:* ${deployDate}\n` +
+    `${mode.icon} *Mode:* ${mode.name}\n` +
+    `${model.icon} *Model:* ${model.name}\n\n` +
     `Was möchtest du tun?`,
     {
       parse_mode: 'Markdown',
@@ -92,6 +111,88 @@ bot.command('start', (ctx) => {
 // Menu Command
 bot.command('menu', (ctx) => {
   ctx.reply('📱 Hauptmenü:', mainMenu);
+});
+
+// Mode Command
+bot.command('mode', (ctx) => {
+  const args = ctx.message.text.split(' ');
+  const userId = ctx.from.id;
+  
+  if (args.length === 1) {
+    // Show current mode
+    const mode = modeManager.getCurrentMode();
+    ctx.reply(
+      `${mode.icon} *Aktueller Modus:* ${mode.name}\n\n` +
+      `${mode.description}\n\n` +
+      `Nutze:​\n` +
+      `/mode full - Full Power Mode (🔓 Nur für dich)\n` +
+      `/mode showcase - Showcase Mode (🎭 Für Präsentationen)`,
+      { parse_mode: 'Markdown' }
+    );
+  } else {
+    const requestedMode = args[1].toUpperCase();
+    
+    // Check permissions for FULL_POWER
+    if (requestedMode === 'FULL' && !modeManager.canSwitchMode(userId)) {
+      ctx.reply('❌ Nur Arash kann in den Full Power Mode wechseln!');
+      return;
+    }
+    
+    try {
+      const modeKey = requestedMode === 'FULL' ? 'FULL_POWER' : 'SHOWCASE';
+      const newMode = modeManager.setMode(modeKey);
+      ctx.reply(
+        `✅ *Mode gewechselt!*\n\n` +
+        `${newMode.icon} ${newMode.name} ist jetzt aktiv.\n\n` +
+        `_${newMode.description}_`,
+        { parse_mode: 'Markdown' }
+      );
+    } catch (error) {
+      ctx.reply(`❌ Fehler: ${error.message}`);
+    }
+  }
+});
+
+// Model Command
+bot.command('model', (ctx) => {
+  const args = ctx.message.text.split(' ');
+  const userId = ctx.from.id;
+  
+  if (args.length === 1) {
+    // Show current model
+    const model = modelSwitcher.getModelInfo();
+    const stats = modelSwitcher.getCostStats(userId);
+    
+    ctx.reply(
+      `${model.icon} *Aktuelles Model:* ${model.name}\n\n` +
+      `${model.description}\n\n` +
+      `💰 *Kosten:*\n` +
+      `Input: ${model.costPer1M.input}/1M tokens\n` +
+      `Output: ${model.costPer1M.output}/1M tokens\n\n` +
+      `📊 *Deine Statistik:*\n` +
+      `Gesamt: ${stats.userCost || '$0.00'}\n\n` +
+      `Nutze:​\n` +
+      `/model haiku - Schnell & günstig\n` +
+      `/model sonnet - Ausgewogen\n` +
+      `/model opus - Maximum Power`,
+      { parse_mode: 'Markdown' }
+    );
+  } else {
+    const requestedModel = args[1].toLowerCase();
+    
+    try {
+      const newModel = modelSwitcher.setModel(requestedModel, userId);
+      ctx.reply(
+        `✅ *Model gewechselt!*\n\n` +
+        `${newModel.icon} ${newModel.name} ist jetzt aktiv.\n\n` +
+        `_${newModel.description}_\n\n` +
+        `💵 Geschätzte Kosten: ${newModel.estimatedCost.total} pro 1000 tokens`,
+        { parse_mode: 'Markdown' }
+      );
+    } catch (error) {
+      ctx.reply(`❌ Fehler: ${error.message}`);
+    }
+  }
 });
 
 // AI Command - Direct AI interaction
@@ -357,7 +458,7 @@ bot.action('dev_tools', (ctx) => {
     'Deine Entwickler-Werkzeuge:',
     {
       parse_mode: 'Markdown',
-      ...devToolsMenu
+      ...getDevToolsMenu()
     }
   );
 });
@@ -426,6 +527,315 @@ bot.action('sync_knowledge', (ctx) => {
       ...Markup.inlineKeyboard([[Markup.button.callback('⬅️ Zurück', 'dev_tools')]])
     }
   );
+});
+
+// MODE SWITCHER
+bot.action('mode_switch', (ctx) => {
+  ctx.answerCbQuery();
+  const currentMode = modeManager.getCurrentMode();
+  const userId = ctx.from.id;
+  
+  // Create mode selection menu
+  const modeButtons = Object.entries(modeManager.modes).map(([key, mode]) => ([
+    Markup.button.callback(
+      `${mode.icon} ${mode.name} ${key === currentMode.mode ? '✓' : ''}`,
+      `set_mode_${key}`
+    )
+  ]));
+  
+  ctx.editMessageText(
+    `🔐 **Mode Manager**\n\n` +
+    `Aktueller Modus: ${currentMode.icon} ${currentMode.name}\n\n` +
+    `${currentMode.description}\n\n` +
+    `📊 **Mode Details:**\n` +
+    `- Access Level: ${currentMode.access}\n` +
+    `- Max File Size: ${(currentMode.maxFileSize / 1024 / 1024).toFixed(0)}MB\n` +
+    `- Show Private: ${currentMode.showPrivate ? '✅' : '❌'}\n\n` +
+    `Wähle einen Modus:`,
+    {
+      parse_mode: 'Markdown',
+      ...Markup.inlineKeyboard([
+        ...modeButtons,
+        [Markup.button.callback('⬅️ Zurück', 'dev_tools')]
+      ])
+    }
+  );
+});
+
+// Set Mode Handlers
+bot.action('set_mode_FULL_POWER', (ctx) => {
+  const userId = ctx.from.id;
+  
+  // Check permission
+  if (!modeManager.canSwitchMode(userId)) {
+    ctx.answerCbQuery('❌ Nur Arash kann Full Power Mode aktivieren!', true);
+    return;
+  }
+  
+  const newMode = modeManager.setMode('FULL_POWER');
+  ctx.answerCbQuery(`✅ ${newMode.name} aktiviert!`);
+  
+  // Reload knowledge with new mode
+  knowledgeLoader.loadAllKnowledge().then(knowledge => {
+    claudeService.updateSystemPrompt(knowledge);
+  });
+  
+  // Return to mode menu
+  bot.emit('action', Object.assign(ctx, { match: ['mode_switch'] }));
+});
+
+bot.action('set_mode_SHOWCASE', (ctx) => {
+  const newMode = modeManager.setMode('SHOWCASE');
+  ctx.answerCbQuery(`✅ ${newMode.name} aktiviert!`);
+  
+  // Reload knowledge with new mode
+  knowledgeLoader.loadAllKnowledge().then(knowledge => {
+    claudeService.updateSystemPrompt(knowledge);
+  });
+  
+  // Return to mode menu
+  bot.emit('action', Object.assign(ctx, { match: ['mode_switch'] }));
+});
+
+// MODEL SWITCHER
+bot.action('model_switch', (ctx) => {
+  ctx.answerCbQuery();
+  const currentModel = modelSwitcher.getModelInfo();
+  const userId = ctx.from.id;
+  const stats = modelSwitcher.getCostStats(userId);
+  
+  const modelButtons = modelSwitcher.getAllModels().map(model => [
+    Markup.button.callback(
+      `${model.icon} ${model.name} ${model.isCurrent ? '✓' : ''}`,
+      `set_model_${model.key}`
+    )
+  ]);
+  
+  ctx.editMessageText(
+    `🤖 **Model Switcher**\n\n` +
+    `Aktuelles Model: ${currentModel.icon} ${currentModel.name}\n\n` +
+    `${currentModel.description}\n\n` +
+    `💰 **Kosten pro 1M Tokens:**\n` +
+    `- Input: ${currentModel.costPer1M.input}\n` +
+    `- Output: ${currentModel.costPer1M.output}\n\n` +
+    `📊 **Deine Statistik:**\n` +
+    `- Gesamt: ${stats.userCost || '$0.00'}\n` +
+    `- Requests: ${stats.usage.total}\n\n` +
+    `Wähle ein Model:`,
+    {
+      parse_mode: 'Markdown',
+      ...Markup.inlineKeyboard([
+        ...modelButtons,
+        [Markup.button.callback('💰 Kosten Details', 'model_costs')],
+        [Markup.button.callback('⬅️ Zurück', 'dev_tools')]
+      ])
+    }
+  );
+});
+
+// Set Model Handlers
+bot.action(/^set_model_(.+)$/, (ctx) => {
+  const modelKey = ctx.match[1];
+  const userId = ctx.from.id;
+  
+  try {
+    const newModel = modelSwitcher.setModel(modelKey, userId);
+    ctx.answerCbQuery(`✅ ${newModel.name} aktiviert!`);
+    
+    // Return to model menu
+    bot.emit('action', Object.assign(ctx, { match: ['model_switch'] }));
+  } catch (error) {
+    ctx.answerCbQuery(`❌ ${error.message}`, true);
+  }
+});
+
+// Model Costs Details
+bot.action('model_costs', (ctx) => {
+  ctx.answerCbQuery();
+  const stats = modelSwitcher.getCostStats(ctx.from.id);
+  
+  let costDetails = `💰 **Kosten-Übersicht**\n\n`;
+  costDetails += `**Gesamt:** ${stats.totalCost}\n\n`;
+  
+  costDetails += `**Nach Model:**\n`;
+  Object.entries(stats.byModel).forEach(([model, cost]) => {
+    const usage = stats.usage.byModel[model] || 0;
+    costDetails += `${modelSwitcher.models[model].icon} ${model}: ${cost} (${usage} requests)\n`;
+  });
+  
+  costDetails += `\n**Deine Kosten:** ${stats.userCost || '$0.00'}`;
+  
+  ctx.editMessageText(costDetails, {
+    parse_mode: 'Markdown',
+    ...Markup.inlineKeyboard([
+      [Markup.button.callback('⬅️ Zurück', 'model_switch')]
+    ])
+  });
+});
+
+// INSTRUCTION EDITOR
+bot.action('instruction_editor', (ctx) => {
+  ctx.answerCbQuery();
+  const stats = instructionManager.getStats();
+  const currentInstruction = instructionManager.formatForDisplay();
+  
+  ctx.editMessageText(
+    `✏️ **Instruction Editor**\n\n` +
+    `📝 Aktuelle Instruction (${stats.currentLength}/${stats.maxLength} chars):\n` +
+    `_${currentInstruction}_\n\n` +
+    `Wähle eine Aktion:`,
+    {
+      parse_mode: 'Markdown',
+      ...Markup.inlineKeyboard([
+        [Markup.button.callback('📝 Bearbeiten', 'inst_edit'), Markup.button.callback('📋 Templates', 'inst_templates')],
+        [Markup.button.callback('⏮️ History', 'inst_history'), Markup.button.callback('🔄 Reset', 'inst_reset')],
+        [Markup.button.callback('⬅️ Zurück', 'dev_tools')]
+      ])
+    }
+  );
+});
+
+// Instruction Edit
+bot.action('inst_edit', (ctx) => {
+  ctx.answerCbQuery();
+  ctx.session = { ...ctx.session, expecting: 'instruction_edit' };
+  
+  ctx.editMessageText(
+    `📝 **Instruction bearbeiten**\n\n` +
+    `Schicke mir die neue Instruction für Claude.\n\n` +
+    `💡 **Tipps:**\n` +
+    `- Sei spezifisch über Persönlichkeit\n` +
+    `- Definiere Antwort-Stil\n` +
+    `- Max ${instructionManager.maxLength} Zeichen\n\n` +
+    `_Schicke "cancel" zum Abbrechen_`,
+    { parse_mode: 'Markdown' }
+  );
+});
+
+// Instruction Templates
+bot.action('inst_templates', (ctx) => {
+  ctx.answerCbQuery();
+  const templates = instructionManager.getTemplates();
+  
+  const templateButtons = templates.map(template => [
+    Markup.button.callback(
+      `${template.icon} ${template.name} ${template.isCurrent ? '✓' : ''}`,
+      `use_template_${template.key}`
+    )
+  ]);
+  
+  ctx.editMessageText(
+    `📋 **Instruction Templates**\n\n` +
+    `Wähle ein vordefiniertes Template:`,
+    {
+      parse_mode: 'Markdown',
+      ...Markup.inlineKeyboard([
+        ...templateButtons,
+        [Markup.button.callback('⬅️ Zurück', 'instruction_editor')]
+      ])
+    }
+  );
+});
+
+// Use Template Handler
+bot.action(/^use_template_(.+)$/, async (ctx) => {
+  const templateKey = ctx.match[1];
+  const userId = ctx.from.id;
+  
+  try {
+    const result = await instructionManager.useTemplate(templateKey, userId);
+    ctx.answerCbQuery(`✅ ${result.template} aktiviert!`);
+    
+    // Update Claude prompt
+    const knowledge = await knowledgeLoader.loadAllKnowledge();
+    const instruction = instructionManager.getCurrentInstruction(userId);
+    claudeService.updateSystemPrompt(knowledge + '\n\n' + instruction);
+    
+    // Return to instruction editor
+    bot.emit('action', Object.assign(ctx, { match: ['instruction_editor'] }));
+  } catch (error) {
+    ctx.answerCbQuery(`❌ ${error.message}`, true);
+  }
+});
+
+// Instruction History
+bot.action('inst_history', (ctx) => {
+  ctx.answerCbQuery();
+  const history = instructionManager.history;
+  
+  if (history.length === 0) {
+    ctx.editMessageText(
+      `⏮️ **Instruction History**\n\n` +
+      `_Keine History vorhanden_`,
+      {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback('⬅️ Zurück', 'instruction_editor')]
+        ])
+      }
+    );
+    return;
+  }
+  
+  const historyButtons = history.slice(0, 5).map((inst, idx) => [
+    Markup.button.callback(
+      `${idx + 1}. ${inst.substring(0, 30)}...`,
+      `use_history_${idx}`
+    )
+  ]);
+  
+  ctx.editMessageText(
+    `⏮️ **Instruction History**\n\n` +
+    `Wähle eine frühere Instruction:`,
+    {
+      parse_mode: 'Markdown',
+      ...Markup.inlineKeyboard([
+        ...historyButtons,
+        [Markup.button.callback('⬅️ Zurück', 'instruction_editor')]
+      ])
+    }
+  );
+});
+
+// Use History Handler
+bot.action(/^use_history_(\d+)$/, async (ctx) => {
+  const idx = parseInt(ctx.match[1]);
+  const userId = ctx.from.id;
+  
+  try {
+    const result = await instructionManager.applyEdit(userId, 'history', idx);
+    ctx.answerCbQuery('✅ History Instruction aktiviert!');
+    
+    // Update Claude prompt
+    const knowledge = await knowledgeLoader.loadAllKnowledge();
+    const instruction = instructionManager.getCurrentInstruction(userId);
+    claudeService.updateSystemPrompt(knowledge + '\n\n' + instruction);
+    
+    // Return to instruction editor
+    bot.emit('action', Object.assign(ctx, { match: ['instruction_editor'] }));
+  } catch (error) {
+    ctx.answerCbQuery(`❌ ${error.message}`, true);
+  }
+});
+
+// Instruction Reset
+bot.action('inst_reset', async (ctx) => {
+  const userId = ctx.from.id;
+  
+  try {
+    await instructionManager.resetToDefault(userId);
+    ctx.answerCbQuery('✅ Instruction zurückgesetzt!');
+    
+    // Update Claude prompt
+    const knowledge = await knowledgeLoader.loadAllKnowledge();
+    const instruction = instructionManager.getCurrentInstruction(userId);
+    claudeService.updateSystemPrompt(knowledge + '\n\n' + instruction);
+    
+    // Return to instruction editor
+    bot.emit('action', Object.assign(ctx, { match: ['instruction_editor'] }));
+  } catch (error) {
+    ctx.answerCbQuery(`❌ ${error.message}`, true);
+  }
 });
 
 // FILE EDITOR
@@ -752,6 +1162,37 @@ bot.on('text', async (ctx) => {
     return;
   }
   
+  // INSTRUCTION EDIT HANDLER
+  if (session.expecting === 'instruction_edit') {
+    if (userMessage.toLowerCase() === 'cancel') {
+      ctx.reply('❌ Bearbeitung abgebrochen', mainMenu);
+      ctx.session = { ...session, expecting: null };
+      return;
+    }
+    
+    try {
+      const result = await instructionManager.setInstruction(userMessage, userId);
+      ctx.answerCbQuery(`✅ Instruction aktualisiert!`);
+      
+      // Update Claude prompt
+      const knowledge = await knowledgeLoader.loadAllKnowledge();
+      const instruction = instructionManager.getCurrentInstruction(userId);
+      claudeService.updateSystemPrompt(knowledge + '\n\n' + instruction);
+      
+      ctx.reply(
+        `✅ **Instruction aktualisiert!**\n\n` +
+        `Länge: ${result.length} Zeichen\n\n` +
+        `_Claude verwendet jetzt die neue Instruction._`,
+        { parse_mode: 'Markdown', ...mainMenu }
+      );
+    } catch (error) {
+      ctx.reply(`❌ Fehler: ${error.message}`, mainMenu);
+    }
+    
+    ctx.session = { ...session, expecting: null };
+    return;
+  }
+  
   // FILE EDIT HANDLERS
   if (session.expecting === 'file_path_to_edit') {
     const filePath = userMessage.trim();
@@ -915,13 +1356,22 @@ bot.on('text', async (ctx) => {
       // Direkte Antwort aus Knowledge Base
       aiResponse = knowledgeAnswer;
     } else {
-      // Claude AI mit Knowledge Context
+      // Claude AI mit Knowledge Context und dynamischem Model
       const context = {
         userName: 'Arash',
         ...session
       };
       
-      aiResponse = await claudeService.getResponse(userId, userMessage, context);
+      // Use model switcher instead of direct claude service
+      const instruction = instructionManager.getCurrentInstruction(userId);
+      const systemPrompt = claudeService.systemPrompt + '\n\n' + instruction;
+      
+      const response = await modelSwitcher.getResponse(userId, userMessage, systemPrompt);
+      aiResponse = response.content;
+      
+      // Show which model was used
+      const modelInfo = modelSwitcher.getModelInfo(response.model);
+      aiResponse += `\n\n_${modelInfo.icon} ${modelInfo.name} used_`;
     }
     
     // Personalisierte Response Buttons

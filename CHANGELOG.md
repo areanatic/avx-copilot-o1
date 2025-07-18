@@ -1,4 +1,62 @@
-# AVX Copilot v1.3.0 - New Features Release
+# AVX Copilot Changelog
+
+## 🚀 Version 2.1.0 - AI Intelligence Update (2025-07-18)
+
+### 🎉 Major New Features
+
+#### 🔐 Mode Manager
+- **FULL_POWER Mode**: Voller Zugriff auf alle Daten (nur für Arash)
+- **SHOWCASE Mode**: Sicherer Modus für Präsentationen
+- Filtert sensitive Daten basierend auf aktivem Mode
+- Mode-aware Knowledge Loading
+- Blacklist-System für sensitive Begriffe
+
+#### 🤖 3-Tier Model Switcher
+- **Haiku ($0.25/1M)**: Schnell & günstig für einfache Anfragen
+- **Sonnet ($3/1M)**: Ausgewogen für die meisten Aufgaben
+- **Opus ($15/1M)**: Maximum Power für komplexe Analysen
+- Automatische Model-Auswahl basierend auf Query-Komplexität
+- Echtzeit-Kostentracking pro User und Model
+- Fallback-Mechanismen bei Rate Limits
+
+#### 📝 Instruction Editor
+- Dynamische System-Prompt Verwaltung
+- 5 vordefinierte Templates (Coder, Researcher, Creative, Teacher)
+- Instruction History (letzte 10 Versionen)
+- User-spezifische Instructions möglich
+- Max 4000 Zeichen pro Instruction
+
+### 🔧 Technische Verbesserungen
+
+- **knowledge-loader-v2.js**: Rekursives Laden mit Mode-Filtering
+- **Dynamisches Dev Tools Menu**: Zeigt aktuelle Mode/Model Icons
+- **Enhanced AI Responses**: Zeigt genutztes Model an
+- **Session Management**: Verbesserte Context-Awareness
+- **Error Handling**: Robustere Fehlerbehandlung
+
+### 📱 Neue Commands
+
+- `/mode` - Zeigt aktuellen Mode
+- `/mode full|showcase` - Wechselt Mode
+- `/model` - Zeigt Model & Kosten
+- `/model haiku|sonnet|opus` - Wechselt Model
+
+### 📊 Stats & Tracking
+
+- Kosten-Tracking pro User
+- Model-Usage Statistiken
+- Performance Metriken
+- Knowledge Base Größe: Dynamisch basierend auf Mode
+
+### 🐛 Fixes
+
+- Railway Deployment optimiert
+- Module Loading verbessert
+- Memory Management optimiert
+
+---
+
+## 📚 Version 1.3.0 - New Features Release
 
 ## 🎉 New Features
 
