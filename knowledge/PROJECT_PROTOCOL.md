@@ -242,3 +242,36 @@ git add . && git commit -m "Update: [description]" && git push origin main
 - [ ] Voice Message Support
 - [ ] Document Analysis
 - [ ] Multi-Language Support
+
+### [2025-07-18 03:15] - Bot Deployment Erfolgreich & Starter Prompt Update
+**Status**: ✅ AVX Copilot o1 läuft erfolgreich mit Buttons auf Railway!
+
+**Gelöste Probleme**:
+- Railway Cache Issue durch Dockerfile CMD Fix
+- Module Path Problem behoben
+- Performance ist EXTREM SCHNELL
+
+**Neue Features dokumentiert**:
+- Claude Git Push Capability
+- Desktop MCP Features
+- `/cp_update` Command für Prompt Updates
+
+**Starter Prompt aktualisiert** mit allen Erkenntnissen aus dieser Session.
+
+### [2025-07-18 19:58] - WICHTIGES LEARNING: Git Push Methode
+**Problem identifiziert**: Claude hatte die elegante Git-Push-Methode vergessen!
+
+**Was passierte**:
+- Claude nutzte die elegante `do shell script` Methode (ohne Terminal-Fenster)
+- Driftete dann ab zur alten Terminal-Fenster-Methode
+- Erkannte nicht selbst, dass die bessere Lösung bereits verwendet wurde
+
+**Erkenntnisse**:
+1. **Kontext-Verlust**: Claude "vergisst" frühere elegante Lösungen
+2. **Standard-Rückfall**: Zurück zu bekannten aber schlechteren Methoden
+3. **Selbst-Reflexion fehlt**: Keine Überprüfung der Methoden-Qualität
+
+**Lösung dokumentiert**:
+- IMMER verwenden: `do shell script "cd /pfad && git add . && git commit -m 'msg' && git push"`
+- NIE Terminal-Fenster öffnen für Git
+- Dokumentiert in `/knowledge/CLAUDE_CAPABILITIES.md`
