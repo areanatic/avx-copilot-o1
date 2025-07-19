@@ -14,6 +14,7 @@ const audioService = require('./audio-service');
 const statsManager = require('./stats-manager');
 const { handleDashboard } = require('./dashboard-handler-v2');
 const runtimeStats = require('./runtime-stats');
+const { setupReminderHandlers, handleReminderMessage } = require('./reminder-bot-integration');
 
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
 
@@ -33,7 +34,10 @@ const mainMenu = Markup.inlineKeyboard([
     Markup.button.callback('💡 Quick Note', 'quick_note')
   ],
   [
-    Markup.button.callback('🔧 Dev Tools', 'dev_tools'),
+    Markup.button.callback('⏰ Reminders', 'reminders'),
+    Markup.button.callback('🔧 Dev Tools', 'dev_tools')
+  ],
+  [
     Markup.button.callback('📈 Analytics', 'analytics')
   ]
 ]);
@@ -1218,6 +1222,11 @@ bot.on('text', async (ctx) => {
   // Track message in persistent stats
   statsManager.trackMessage(userId, 'text');
   
+  // Check if this is a reminder message
+  if (handleReminderMessage(ctx, session)) {
+    return;
+  }
+  
   // QUICK RESPONSES für bekannte Fragen
   const lowerMessage = userMessage.toLowerCase();
   
@@ -1599,6 +1608,10 @@ bot.launch().then(async () => {
     await projectAgents.switchAgent('A&A_Umzug_Elmshorn');
     console.log('🎯 Umzugs-Agent automatisch aktiviert');
   }
+  
+  // Setup Reminder Handlers
+  setupReminderHandlers(bot);
+  console.log('⏰ Reminder System aktiviert');
 });
 
 // Search Notes Handler
