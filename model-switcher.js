@@ -1,5 +1,6 @@
 // 🤖 Model Switcher - Dynamic AI model selection with cost tracking
 const Anthropic = require('@anthropic-ai/sdk');
+const runtimeStats = require('./runtime-stats');
 require('dotenv').config();
 
 class ModelSwitcher {
@@ -162,7 +163,7 @@ class ModelSwitcher {
       });
       
       // Track usage
-      this.trackUsage(modelKey, response.usage, userId);
+      await this.trackUsage(modelKey, response.usage, userId);
       
       return {
         content: response.content[0].text,
@@ -184,7 +185,7 @@ class ModelSwitcher {
   }
   
   // Track usage and costs
-  trackUsage(modelKey, usage, userId) {
+  async trackUsage(modelKey, usage, userId) {
     if (!usage) return;
     
     const model = this.models[modelKey];
@@ -195,6 +196,11 @@ class ModelSwitcher {
     // Update total costs
     this.costTracking.total += totalCost;
     this.costTracking.byModel[modelKey] += totalCost;
+    
+    // UPDATE RUNTIME STATS FÜR DASHBOARD!
+    await runtimeStats.updateStats('Messages', 1);
+    await runtimeStats.updateStats('Tokens', usage.input_tokens + usage.output_tokens);
+    await runtimeStats.updateStats('Cost', totalCost);
     
     // Update user costs
     const userCosts = this.costTracking.byUser.get(userId) || 0;
