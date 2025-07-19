@@ -1,18 +1,9 @@
 {
-  "version": "1.2.0",
-  "buildDate": "2025-07-18",
-  "features": [
-    "S1 Claudia Agent Integration",
-    "Personalisiertes Menü für Arash",
-    "Umzugsprojekt Elmshorn Zugriff",
-    "Multi-Source Knowledge Base",
-    "Dev Tools & Analytics Dashboard",
-    "Quick Note Feature",
-    "Knowledge Base Browser & Search"
-  ],
-  "changelog": {
-    "1.2.0": "Major Update: S1 Integration, personalisiertes Menü, Umzugsprojekt-Zugriff",
-    "1.1.0": "Added automatic Knowledge Base loading and version display",
-    "1.0.0": "Initial release with Claude AI and button interface"
-  }
+  "full": "2.3.0.37-149e73e",
+  "base": "2.3.0",
+  "build": 37,
+  "commit": "149e73e",
+  "commitMessage": "fix: Dashboard zeigt jetzt deutsche Zeit! 🕐",
+  "timestamp": 1752884918541,
+  "deployTime": 1752884918541
 }

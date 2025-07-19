@@ -1,6 +1,7 @@
 // Railway Start File - Bulletproof Version
 const path = require('path');
 const fs = require('fs');
+const versionManager = require('./version-manager');
 
 console.log('🚀 AVX Copilot Starting...');
 console.log('📁 Current directory:', process.cwd());
@@ -8,21 +9,12 @@ console.log('📄 __dirname:', __dirname);
 console.log('📋 Directory contents:');
 console.log(fs.readdirSync('.').join('\n'));
 
-// Set deploy time on start
-try {
-  const deployData = {
-    time: Date.now(),
-    version: process.env.RAILWAY_GIT_COMMIT_SHA || 'unknown',
-    commit: process.env.RAILWAY_GIT_COMMIT_MESSAGE || 'Railway Deploy',
-    deployedAt: new Date().toISOString()
-  };
-  
-  fs.mkdirSync('./data', { recursive: true });
-  fs.writeFileSync('./data/deploy.json', JSON.stringify(deployData, null, 2));
-  console.log('✅ Deploy time set:', new Date(deployData.time).toLocaleString());
-} catch (e) {
-  console.log('⚠️ Could not set deploy time:', e.message);
-}
+// Update deploy time
+versionManager.updateDeployTime();
+const version = versionManager.getVersion();
+console.log(`🆚 Version: ${version.full}`);
+console.log(`📝 Commit: ${version.commitMessage}`);
+console.log(`✅ Deploy time set:`, new Date(version.deployTime).toLocaleString());
 
 // Try multiple paths to find the bot file
 const possiblePaths = [

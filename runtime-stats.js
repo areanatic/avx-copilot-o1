@@ -1,6 +1,7 @@
 // Runtime Stats Manager - Echte Daten!
 const fs = require('fs').promises;
 const path = require('path');
+const versionManager = require('./version-manager');
 
 class RuntimeStats {
   constructor() {
@@ -24,14 +25,11 @@ class RuntimeStats {
 
   async loadData() {
     try {
-      // Deploy Info aus Git
-      const { execSync } = require('child_process');
-      try {
-        this.data.lastGitCommit = execSync('git log -1 --format="%h - %s"').toString().trim();
-        this.data.deployVersion = execSync('git describe --tags --always').toString().trim();
-      } catch (e) {
-        console.log('Git info not available');
-      }
+      // Version Info aus Version Manager
+      const version = versionManager.getVersion();
+      this.data.deployVersion = version.full;
+      this.data.lastGitCommit = `${version.commit} - ${version.commitMessage}`;
+      this.data.deployTime = version.deployTime;
 
       // Stats aus File
       const savedStats = await fs.readFile(this.dataFile, 'utf8').catch(() => '{}');
