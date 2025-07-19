@@ -97,7 +97,7 @@ class RuntimeStats {
     return {
       version: this.data.deployVersion || require('./package.json').version,
       commit: this.data.lastGitCommit || 'unknown',
-      deployTime: new Date(this.data.deployTime).toLocaleString('de-DE')
+      deployTime: this.data.deployTime  // Return raw timestamp
     };
   }
 
@@ -114,9 +114,9 @@ class RuntimeStats {
       uptime: this.getUptime(),
       version: versionInfo.version,
       commit: versionInfo.commit,
-      deployTime: versionInfo.deployTime,
+      deployTime: versionInfo.deployTime,  // Raw timestamp
       stats: this.data.stats,
-      realTime: new Date().toLocaleString('de-DE')
+      realTime: Date.now()  // Raw timestamp
     };
   }
 
