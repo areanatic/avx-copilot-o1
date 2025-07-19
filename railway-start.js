@@ -10,11 +10,6 @@ console.log(fs.readdirSync('.').join('\n'));
 
 // Try multiple paths to find the bot file
 const possiblePaths = [
-  './enhanced-bot-clean.js',
-  'enhanced-bot-clean.js',
-  path.join(__dirname, 'enhanced-bot-clean.js'),
-  path.join(process.cwd(), 'enhanced-bot-clean.js'),
-  '/app/enhanced-bot-clean.js',
   './enhanced-bot-buttons.js',
   'enhanced-bot-buttons.js',
   path.join(__dirname, 'enhanced-bot-buttons.js'),
