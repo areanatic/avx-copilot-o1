@@ -1,6 +1,7 @@
 // 🤖 Claude AI Service for AVX Copilot
 const Anthropic = require('@anthropic-ai/sdk');
 const statsManager = require('./stats-manager');
+const runtimeStats = require('./runtime-stats');
 require('dotenv').config();
 
 class ClaudeService {
@@ -89,6 +90,13 @@ Sprache: Deutsch | Ton: Persönlich, direkt, proaktiv`;
           response.usage.output_tokens,
           'claude-3-opus'
         );
+        
+        // UPDATE Runtime Stats für Dashboard
+        const cost = (response.usage.input_tokens * 15 / 1000000) + 
+                    (response.usage.output_tokens * 75 / 1000000);
+        await runtimeStats.updateStats('Messages', 1);
+        await runtimeStats.updateStats('Tokens', response.usage.input_tokens + response.usage.output_tokens);
+        await runtimeStats.updateStats('Cost', cost);
       }
       statsManager.trackMessage(userId, 'ai-response');
       

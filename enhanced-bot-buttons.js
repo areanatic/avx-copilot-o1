@@ -12,7 +12,8 @@ const modelSwitcher = require('./model-switcher');
 const instructionManager = require('./instruction-manager');
 const audioService = require('./audio-service');
 const statsManager = require('./stats-manager');
-const { handleDashboard } = require('./dashboard-handler');
+const { handleDashboard } = require('./dashboard-handler-v2');
+const runtimeStats = require('./runtime-stats');
 
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
 
