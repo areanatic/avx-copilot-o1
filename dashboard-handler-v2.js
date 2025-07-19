@@ -9,6 +9,9 @@ async function handleDashboard(ctx) {
     // Ignore if no callback query
   }
   
+  // FORCE RELOAD der Stats beim Aufruf!
+  await runtimeStats.loadData();
+  
   // ECHTE Runtime Daten!
   const data = runtimeStats.getDashboardData();
   

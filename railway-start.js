@@ -8,6 +8,22 @@ console.log('📄 __dirname:', __dirname);
 console.log('📋 Directory contents:');
 console.log(fs.readdirSync('.').join('\n'));
 
+// Set deploy time on start
+try {
+  const deployData = {
+    time: Date.now(),
+    version: process.env.RAILWAY_GIT_COMMIT_SHA || 'unknown',
+    commit: process.env.RAILWAY_GIT_COMMIT_MESSAGE || 'Railway Deploy',
+    deployedAt: new Date().toISOString()
+  };
+  
+  fs.mkdirSync('./data', { recursive: true });
+  fs.writeFileSync('./data/deploy.json', JSON.stringify(deployData, null, 2));
+  console.log('✅ Deploy time set:', new Date(deployData.time).toLocaleString());
+} catch (e) {
+  console.log('⚠️ Could not set deploy time:', e.message);
+}
+
 // Try multiple paths to find the bot file
 const possiblePaths = [
   './enhanced-bot-buttons.js',

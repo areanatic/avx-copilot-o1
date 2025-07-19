@@ -9,6 +9,11 @@ yarn-error.log*
 .env.local
 .env.production
 
+# Runtime data - NEVER COMMIT!
+data/
+runtime.json
+deploy.json
+
 # Build output
 dist/
 build/
